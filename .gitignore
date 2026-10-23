@@ -1,0 +1,10 @@
+node_modules/
+dist/
+release/
+app/config.local.php
+public/uploads/*
+!public/uploads/.htaccess
+!public/uploads/.gitkeep
+.test-data/
+playwright-report/
+test-results/
