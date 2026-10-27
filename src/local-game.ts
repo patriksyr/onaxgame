@@ -1,3 +1,4 @@
+import seedCards from "./data/default-cards.json";
 export type Rarity = "common" | "rare" | "epic" | "legendary" | "mythic";
 export type Card = {
   id: number;
@@ -36,39 +37,46 @@ export function dayKey(now = new Date()): string {
     day: "2-digit",
   }).format(now);
 }
-export function defaultCards(image: string): Card[] {
-  return [
-    "Onax Original",
-    "Onax Neko",
-    "Onax Supreme",
-    "Onax Samurai",
-    "První Onax",
-  ].map((name, i) => ({
-    id: i + 1,
-    name,
-    description: [
-      "Každá legenda někde začíná. Tvoje právě tady.",
-      "Nenápadný pohled. Nečekaná síla.",
-      "Tahle karta se ve sbírce neztratí.",
-      "Jeden pohled. Tisíc příběhů.",
-      "Začátek všeho. Konec obyčejných balíčků.",
-    ][i],
-    rarity: Object.keys(RULES)[i] as Rarity,
-    image,
-    price: Object.values(RULES)[i].price,
-    active: 1,
+export function defaultCards(_image?: string): Card[] {
+  return seedCards.map((c) => ({
+    ...c,
+    rarity: c.rarity as Rarity,
+    price: RULES[c.rarity as Rarity].price,
   }));
 }
-export function freshSave(image: string): Save {
+export function freshSave(
+  _image: string,
+  catalog: Card[] = defaultCards(),
+): Save {
+  const cards = catalog.map((c) => ({ ...c }));
   return {
     version: 1,
     coins: 100,
     lastDaily: null,
-    catalog: defaultCards(image),
+    catalog: cards,
     inventory: [],
-    nextCardId: 6,
+    nextCardId: Math.max(...cards.map((c) => c.id)) + 1,
     nextInventoryId: 1,
   };
+}
+const legacyNames = [
+  "Onax Original",
+  "Onax Neko",
+  "Onax Supreme",
+  "Onax Samurai",
+  "První Onax",
+];
+function isLegacyDefault(save: Save, placeholder: string): boolean {
+  return (
+    save.catalog.length === 5 &&
+    save.catalog.every(
+      (c) =>
+        c.id >= 1 &&
+        c.id <= 5 &&
+        c.name === legacyNames[c.id - 1] &&
+        c.image === placeholder,
+    )
+  );
 }
 const integer = (v: unknown) => Number.isSafeInteger(v) && Number(v) >= 0;
 export function validateSave(value: unknown, placeholder: string): Save {
@@ -176,6 +184,7 @@ export class LocalGame {
   constructor(
     private storage: StorageLike,
     private placeholder: string,
+    private seeds: Card[] = defaultCards(),
   ) {}
   load(): Save {
     let raw: string | null;
@@ -187,17 +196,31 @@ export class LocalGame {
       );
     }
     if (raw === null) {
-      const save = freshSave(this.placeholder);
+      const save = freshSave(this.placeholder, this.seeds);
       this.write(save);
       return save;
     }
+    let save: Save;
     try {
-      return validateSave(JSON.parse(raw), this.placeholder);
+      save = validateSave(JSON.parse(raw), this.placeholder);
     } catch {
       throw Error(
         "Uložený postup nelze načíst. Nic jsme nepřepsali. Obnov platnou zálohu nebo zvol výslovný reset.",
       );
     }
+    // Nahrazujeme jen známé původní náhledy; vlastní katalogy a sbírky se nemažou.
+    if (
+      isLegacyDefault(save, this.placeholder) &&
+      this.seeds.some((c) => c.image !== this.placeholder)
+    ) {
+      save.catalog = this.seeds.map((c) => ({ ...c }));
+      save.nextCardId = Math.max(
+        save.nextCardId,
+        ...save.catalog.map((c) => c.id + 1),
+      );
+      this.write(save);
+    }
+    return save;
   }
   private write(save: Save): void {
     validateSave(save, this.placeholder);
@@ -346,7 +369,7 @@ export class LocalGame {
     });
   }
   reset(): void {
-    this.write(freshSave(this.placeholder));
+    this.write(freshSave(this.placeholder, this.seeds));
   }
 }
 export async function imageData(file: File): Promise<string> {

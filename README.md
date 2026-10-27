@@ -6,7 +6,7 @@
 
 1. Z GitHubu stáhni **[onax-local.zip](https://github.com/patriksyr/onaxgame/raw/refs/heads/main/onax-local.zip)** (případně tlačítkem Download raw file).
 2. ZIP nejprve rozbal. Ve složce `onax` otevři **`index.html`** v aktuálním Firefoxu, Chrome nebo Edge. Funguje i offline, bez XAMPP a bez terminálu.
-3. Dostaneš 100 Onaxcoinů a můžeš rovnou otevřít balíček. Ve hře jsou výchozí karty s označeným náhradním obrázkem. V **Karty** přidáš vlastní fotky, názvy, popisy a rarity. Původní fotografie z chatu nejsou součástí zdrojových souborů.
+3. Dostaneš 100 Onaxcoinů a můžeš rovnou otevřít balíček. Hra už obsahuje 10 vlastních Onaxů s fotkami z dodané zálohy. V **Karty** můžeš přidat další fotky, názvy, popisy a rarity. Není potřeba nic ručně importovat.
 4. Přes ozubené kolečko vpravo nahoře zvol **Stáhnout zálohu**. Záloha obsahuje celý postup i obrázky. Na jiném PC ji nahraj přes **Obnovit celý postup**.
 
 **Důležité:** postup není v HTML souboru ani na GitHubu. Je v konkrétním prohlížeči. Anonymní režim, smazání dat prohlížeče, změna prohlížeče nebo přesunutí/přejmenování HTML souboru mohou znamenat jinou či ztracenou uloženou hru. U `file://` se chování úložiště liší mezi prohlížeči; ponech soubor na stejném místě a pravidelně exportuj zálohu. Pokud prohlížeč ukládání blokuje, hra zobrazí chybu a neodečte mince při neúspěšném zápisu. Poškozený postup automaticky nepřepíše.
@@ -19,7 +19,7 @@ Po roztržení balíčku běží pás karet s pevnou středovou značkou a postu
 
 Ve výsledku můžeš **Nechat a točit**, **Prodat a točit** nebo **Jen prodat**. Křížek, Escape a kliknutí mimo okno ho zavřou; neprodaný Onax už je ve sbírce. Další balíček otevřeš také tlačítkem přímo ve sbírce. Pokud nestačí mince, zůstávají dostupné prodej a denní odměna.
 
-Starší JSON zálohy z verze se čtyřmi kartami jsou kompatibilní. V nastavení nahraj soubor a vyber **Načíst jen karty**, pokud chceš nahradit katalog a zachovat současné mince i sbírku; **Obnovit celý postup** nahradí vše. Vlastní fotku mince přidáš přes **Vlastní obrázek Onaxcoinu → Uložit obrázek mince**. Je zahrnuta do exportu. Z dodaných fotografií v chatu se soubory nezískávají automaticky; výchozí katalog proto stále používá náhradní obrázky.
+Starší JSON zálohy z verze se čtyřmi kartami jsou kompatibilní. V nastavení nahraj soubor a vyber **Načíst jen karty**, pokud chceš nahradit katalog a zachovat současné mince i sbírku; **Obnovit celý postup** nahradí vše. Vlastní fotku mince přidáš přes **Vlastní obrázek Onaxcoinu → Uložit obrázek mince**. Je zahrnuta do exportu. Výchozí katalog obsahuje všech 10 aktivních vlastních karet z dodané JSON zálohy; původních pět vyřazených náhledů vynechává. Mince, denní odměna ani sbírka autora se nepřebírají. Nová hra začíná se 100 OC a prázdnou sbírkou. Instalace, která má dosud jen původních pět náhledů, se aktualizuje automaticky při zachování získaných karet a mincí. Vlastní upravené katalogy se nepřepisují.
 
 Před aktualizací si ve staré verzi exportuj zálohu. Novým HTML můžeš nahradit starý soubor na stejném místě; pokud prohlížeč původní data nenajde, použij import.
 

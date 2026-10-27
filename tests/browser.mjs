@@ -49,6 +49,18 @@ try {
   const page = await profile();
   assert.match(await page.locator(".balance").textContent(), /100/);
   assert.equal(await page.locator(".connection-banner").count(), 0);
+  assert.equal(
+    await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem("roll-an-onax-local-v1")).catalog
+          .length,
+    ),
+    10,
+  );
+  await page.waitForFunction(() => {
+    const img = document.querySelector(".hero-card img");
+    return img?.complete && img.naturalWidth > 0;
+  });
   await page.screenshot({
     path: ".test-data/purple-desktop.png",
     fullPage: true,
@@ -121,32 +133,28 @@ try {
   const raw = await readFile(await (await downloading).path(), "utf8");
   const saved = JSON.parse(raw);
   assert.equal(saved.inventory.length, 2);
-  assert.equal(saved.catalog.length, 6);
+  assert.equal(saved.catalog.length, 11);
   assert.ok(saved.coinImage.startsWith("data:image/jpeg;"));
   page.on("dialog", (d) => d.accept());
   await page.locator("[data-action=reset]").click();
   await page.locator("#modal").waitFor({ state: "hidden" });
   assert.match(await page.locator(".balance").textContent(), /100/);
   await page.getByRole("button", { name: "Záloha a nastavení" }).click();
-  await page
-    .locator("#import-file")
-    .setInputFiles({
-      name: "backup.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(raw),
-    });
+  await page.locator("#import-file").setInputFiles({
+    name: "backup.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(raw),
+  });
   await page.locator("[data-action=import]").click();
   await page.locator("#modal").waitFor({ state: "hidden" });
   assert.equal(await count(page), 2);
   // Samotný katalog ze stejné zálohy nesmí změnit peníze ani sbírku.
   await page.getByRole("button", { name: "Záloha a nastavení" }).click();
-  await page
-    .locator("#import-file")
-    .setInputFiles({
-      name: "backup.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(raw),
-    });
+  await page.locator("#import-file").setInputFiles({
+    name: "backup.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(raw),
+  });
   await page.locator("[data-action=import-catalog]").click();
   await page.locator("#modal").waitFor({ state: "hidden" });
   assert.equal(await count(page), 2);
@@ -173,13 +181,11 @@ try {
   const other = await profile();
   other.on("dialog", (d) => d.accept());
   await other.getByRole("button", { name: "Záloha a nastavení" }).click();
-  await other
-    .locator("#import-file")
-    .setInputFiles({
-      name: "backup.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(raw),
-    });
+  await other.locator("#import-file").setInputFiles({
+    name: "backup.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(raw),
+  });
   await other.locator("[data-action=import]").click();
   await other.locator("#modal").waitFor({ state: "hidden" });
   assert.equal(await count(other), 2);

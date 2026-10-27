@@ -6,6 +6,9 @@ import {
   SAVE_KEY,
   dayKey,
   validateSave,
+  freshSave,
+  defaultCards,
+  RULES,
 } from "../src/local-game.ts";
 function fixture() {
   const data = new Map<string, string>();
@@ -15,14 +18,35 @@ function fixture() {
       data.set(key, value);
     },
   };
-  return { game: new LocalGame(storage, "placeholder"), data, storage };
+  const names = [
+    "Onax Original",
+    "Onax Neko",
+    "Onax Supreme",
+    "Onax Samurai",
+    "První Onax",
+  ];
+  const seeds = Object.keys(RULES).map((rarity, i) => ({
+    id: i + 1,
+    name: names[i],
+    description: "Testovací karta",
+    rarity: rarity as keyof typeof RULES,
+    image: "placeholder",
+    price: Object.values(RULES)[i].price,
+    active: 1,
+  }));
+  return {
+    game: new LocalGame(storage, "placeholder", seeds),
+    data,
+    storage,
+    seeds,
+  };
 }
 test("nová hra má 100 mincí a pět aktivních rarit, obnova zachová postup", () => {
-  const { game, storage } = fixture();
+  const { game, storage, seeds } = fixture();
   assert.equal(game.load().coins, 100);
   assert.equal(game.load().catalog.length, 5);
   game.buy(() => 0);
-  const restored = new LocalGame(storage, "placeholder");
+  const restored = new LocalGame(storage, "placeholder", seeds);
   assert.equal(restored.load().coins, 90);
   assert.equal(restored.load().inventory.length, 1);
 });
@@ -216,4 +240,50 @@ test("import pouze katalogu zachová peníze a staré úlovky bez kolize ID", ()
   const restored = fixture().game;
   restored.import(game.export());
   assert.deepEqual(restored.load(), after);
+});
+
+test("výchozí hra obsahuje všech deset vlastních karet s fotkami, bez cizího postupu", () => {
+  const save = freshSave("placeholder");
+  assert.equal(save.catalog.length, 10);
+  assert.equal(save.coins, 100);
+  assert.deepEqual(save.inventory, []);
+  assert.equal(save.lastDaily, null);
+  assert.equal(save.nextCardId, 16);
+  assert.ok(
+    save.catalog.every(
+      (c) => c.active === 1 && c.image.startsWith("data:image/jpeg;base64,"),
+    ),
+  );
+  assert.equal(new Set(save.catalog.map((c) => c.rarity)).size, 5);
+  validateSave(save, "placeholder");
+  const second = freshSave("placeholder");
+  save.catalog[0].name = "Změna";
+  assert.notEqual(second.catalog[0].name, "Změna");
+});
+
+test("automatický přechod ze starých náhledů zachová mince a sbírku", () => {
+  const { game, storage } = fixture();
+  game.buy(() => 0);
+  const before = game.load();
+  const updated = new LocalGame(storage, "placeholder");
+  const after = updated.load();
+  assert.equal(after.catalog.length, 10);
+  assert.equal(after.coins, before.coins);
+  assert.deepEqual(after.inventory, before.inventory);
+  assert.ok(after.nextCardId >= 16);
+  assert.equal(updated.buy(() => 0).length, 1);
+  assert.equal(updated.load().coins, 80);
+});
+
+test("aktualizace nepřepíše vlastní katalog ani stav vyřazení", () => {
+  const { game, storage } = fixture();
+  game.addCard({
+    name: "Moje vlastní",
+    description: "",
+    rarity: "common",
+    image: "placeholder",
+  });
+  game.toggle(1);
+  const before = game.load();
+  assert.deepEqual(new LocalGame(storage, "placeholder").load(), before);
 });
