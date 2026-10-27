@@ -19,6 +19,7 @@ export const RULES = {
 export const SAVE_KEY = "roll-an-onax-local-v1";
 export type Save = {
   version: 1;
+  coinImage?: string;
   coins: number;
   lastDaily: string | null;
   catalog: Card[];
@@ -123,6 +124,15 @@ export function validateSave(value: unknown, placeholder: string): Save {
       ...(owned ? { inventory_id: c.inventory_id } : {}),
     };
   };
+  if (
+    s.coinImage !== undefined &&
+    (typeof s.coinImage !== "string" ||
+      s.coinImage.length > 1500000 ||
+      !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(
+        s.coinImage,
+      ))
+  )
+    return bad();
   const catalog = s.catalog.map((c) => validateCard(c));
   const images = new Map(catalog.map((c) => [c.id, c.image]));
   const inventory = s.inventory.map((c) =>
@@ -143,6 +153,7 @@ export function validateSave(value: unknown, placeholder: string): Save {
     return bad();
   return {
     version: 1,
+    ...(s.coinImage ? { coinImage: s.coinImage } : {}),
     coins: s.coins,
     lastDaily: s.lastDaily,
     catalog,
@@ -227,7 +238,7 @@ export class LocalGame {
       if (Object.values(pool).some((p) => !p.length))
         throw Error("V losování musí zůstat alespoň jedna karta každé rarity.");
       const result: Card[] = [];
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < 1; i++) {
         let roll = Math.floor(random() * 100) + 1;
         let rarity: Rarity = "mythic";
         for (const [r, rule] of Object.entries(RULES)) {
@@ -295,6 +306,11 @@ export class LocalGame {
       card.active = card.active ? 0 : 1;
     });
   }
+  setCoinImage(image: string): void {
+    this.change((s) => {
+      s.coinImage = image;
+    });
+  }
   export(): string {
     return JSON.stringify(compact(this.load()));
   }
@@ -308,6 +324,26 @@ export class LocalGame {
       throw Error("Soubor neobsahuje platnou JSON zálohu.");
     }
     this.write(validateSave(parsed, this.placeholder));
+  }
+  importCatalog(raw: string): void {
+    if (raw.length > 5000000) throw Error("Záloha může mít nejvýše 5 MB.");
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw Error("Soubor neobsahuje platnou JSON zálohu.");
+    }
+    const imported = validateSave(parsed, this.placeholder);
+    if (
+      Object.keys(RULES).some(
+        (r) => !imported.catalog.some((c) => c.rarity === r && c.active),
+      )
+    )
+      throw Error("Katalog musí obsahovat aktivní kartu každé rarity.");
+    this.change((s) => {
+      s.catalog = imported.catalog.map((c) => ({ ...c, id: s.nextCardId++ }));
+      if (imported.coinImage) s.coinImage = imported.coinImage;
+    });
   }
   reset(): void {
     this.write(freshSave(this.placeholder));

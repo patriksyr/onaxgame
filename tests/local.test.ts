@@ -1,3 +1,4 @@
+import { createReel } from "../src/reel.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -23,17 +24,17 @@ test("nová hra má 100 mincí a pět aktivních rarit, obnova zachová postup",
   game.buy(() => 0);
   const restored = new LocalGame(storage, "placeholder");
   assert.equal(restored.load().coins, 90);
-  assert.equal(restored.load().inventory.length, 4);
+  assert.equal(restored.load().inventory.length, 1);
 });
-test("balíček stojí 10 mincí, uloží čtyři duplikáty a prodej nelze opakovat", () => {
+test("balíček stojí 10 mincí, uloží jednoho Onaxe a prodej nelze opakovat", () => {
   const { game } = fixture();
   const cards = game.buy(() => 0);
-  assert.equal(cards.length, 4);
+  assert.equal(cards.length, 1);
   assert.equal(new Set(cards.map((c) => c.id)).size, 1);
-  assert.equal(new Set(cards.map((c) => c.inventory_id)).size, 4);
+  assert.equal(new Set(cards.map((c) => c.inventory_id)).size, 1);
   game.sell(cards[0].inventory_id!);
   assert.equal(game.load().coins, 91);
-  assert.equal(game.load().inventory.length, 3);
+  assert.equal(game.load().inventory.length, 0);
   assert.throws(() => game.sell(cards[0].inventory_id!), /není ve sbírce/);
   assert.equal(game.load().coins, 91);
 });
@@ -56,11 +57,11 @@ test("všech sto hodnot losu odpovídá poměru 60/25/10/4/1", () => {
     for (const c of cards) counts[c.rarity] = (counts[c.rarity] ?? 0) + 1;
   }
   assert.deepEqual(counts, {
-    common: 240,
-    rare: 100,
-    epic: 40,
-    legendary: 16,
-    mythic: 4,
+    common: 60,
+    rare: 25,
+    epic: 10,
+    legendary: 4,
+    mythic: 1,
   });
 });
 test("denní odměna jednou za pražský den včetně změny data a návratu hodin", () => {
@@ -132,7 +133,7 @@ test("poslední kartu rarity nelze vyřadit; starý úlovek zůstává ve sbírc
     image: "placeholder",
   });
   game.toggle(1);
-  assert.equal(game.load().inventory.length, 4);
+  assert.equal(game.load().inventory.length, 1);
   assert.ok(game.buy(() => 0).every((c) => c.id === 6));
 });
 
@@ -146,7 +147,7 @@ test("fotka se neukládá znovu pro každý získaný duplikát", () => {
   });
   game.toggle(1);
   for (let i = 0; i < 5; i++) game.buy(() => 0);
-  assert.equal(game.load().inventory.length, 20);
+  assert.equal(game.load().inventory.length, 5);
   assert.ok(data.get(SAVE_KEY)!.length < 150000);
   assert.equal(
     game.load().inventory[0].image,
@@ -155,4 +156,64 @@ test("fotka se neukládá znovu pro každý získaný duplikát", () => {
   const other = fixture().game;
   other.import(game.export());
   assert.deepEqual(other.load(), game.load());
+});
+
+test("starší záloha se čtyřmi kartami i nová mince zůstávají kompatibilní", () => {
+  const { game } = fixture();
+  const old = JSON.parse(game.export());
+  old.inventory = Array.from({ length: 4 }, (_, i) => ({
+    ...old.catalog[0],
+    inventory_id: i + 1,
+  }));
+  old.nextInventoryId = 5;
+  game.import(JSON.stringify(old));
+  assert.equal(game.load().inventory.length, 4);
+  game.setCoinImage("data:image/jpeg;base64,YWJj");
+  const other = fixture().game;
+  other.import(game.export());
+  assert.equal(other.load().coinImage, "data:image/jpeg;base64,YWJj");
+  assert.equal(other.load().inventory.length, 4);
+  assert.equal(other.buy(() => 0).length, 1);
+});
+
+test("reel skrývá obě nejvyšší rarity za totožný symbol a drží uloženého vítěze", () => {
+  const { game } = fixture();
+  const c = game.load().catalog;
+  const legendary = createReel(c, c[3], () => 0.99),
+    mythic = createReel(c, c[4], () => 0.99);
+  assert.deepEqual(legendary.items[legendary.winningIndex], {
+    kind: "special",
+  });
+  assert.deepEqual(legendary.items, mythic.items);
+  assert.ok(!JSON.stringify(legendary.items).includes("legendary"));
+  assert.ok(!JSON.stringify(legendary.items).includes("mythic"));
+  const normal = createReel(c, c[1], () => 0.99);
+  assert.deepEqual(normal.items[normal.winningIndex], {
+    kind: "card",
+    card: c[1],
+  });
+});
+
+test("import pouze katalogu zachová peníze a staré úlovky bez kolize ID", () => {
+  const { game } = fixture();
+  game.buy(() => 0);
+  const before = game.load();
+  const custom = fixture().game;
+  custom.addCard({
+    name: "Nová karta ze zálohy",
+    description: "",
+    rarity: "mythic",
+    image: "data:image/png;base64,YWJj",
+  });
+  custom.setCoinImage("data:image/png;base64,YWJj");
+  game.importCatalog(custom.export());
+  const after = game.load();
+  assert.equal(after.coins, before.coins);
+  assert.deepEqual(after.inventory, before.inventory);
+  assert.ok(after.catalog.every((c) => c.id >= before.nextCardId));
+  assert.ok(after.catalog.some((c) => c.name === "Nová karta ze zálohy"));
+  assert.equal(after.coinImage, "data:image/png;base64,YWJj");
+  const restored = fixture().game;
+  restored.import(game.export());
+  assert.deepEqual(restored.load(), after);
 });
