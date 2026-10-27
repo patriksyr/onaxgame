@@ -1,48 +1,47 @@
-# Roll an Onax
+# Roll an Onax — lokální verze
 
-Česká sběratelská hra pro PHP 8.2+ a MySQL 8 / MariaDB 10.6+. TypeScript, Vite a GSAP se používají při sestavení; školní server Node.js nepotřebuje.
+Česká sběratelská hra bez účtů, hesel, PHP, MySQL a instalace. Mince, sbírka i vlastní karty se ukládají do localStorage v prohlížeči.
 
-## Co umí
+## Jak hrát na libovolném PC
 
-Registrace a přihlášení přes jméno/heslo, 100 počátečních mincí, 20 mincí denně (kalendářní den Europe/Prague), balíček čtyř karet za 10 mincí, odhalování karet, sbírka, prodej a administrace s nahráváním obrázků. Rarity: Common 60 % / 1 OC, Rare 25 % / 2 OC, Epic 10 % / 4 OC, Legendary 4 % / 8 OC, Mythic 1 % / 20 OC. Každý slot se losuje samostatně; duplicity jsou možné. V rámci rarity mají aktivní karty stejnou šanci.
+1. Z GitHubu stáhni **[onax-local.zip](https://github.com/patriksyr/onaxgame/raw/refs/heads/main/onax-local.zip)** (případně tlačítkem Download raw file).
+2. ZIP nejprve rozbal. Ve složce `onax` otevři **`index.html`** v aktuálním Firefoxu, Chrome nebo Edge. Funguje i offline, bez XAMPP a bez terminálu.
+3. Dostaneš 100 Onaxcoinů a můžeš rovnou otevřít balíček. Ve hře jsou výchozí karty s označeným náhradním obrázkem. V **Karty** přidáš vlastní fotky, názvy, popisy a rarity. Původní fotografie z chatu nejsou součástí zdrojových souborů.
+4. Přes ozubené kolečko vpravo nahoře zvol **Stáhnout zálohu**. Záloha obsahuje celý postup i obrázky. Na jiném PC ji nahraj přes **Obnovit zálohu**.
 
-Mince jsou pouze herní a nelze je koupit ani směnit za skutečné peníze. Průměrná prodejní hodnota celého balíčku je 8,08 OC, cena 10 OC.
+**Důležité:** postup není v HTML souboru ani na GitHubu. Je v konkrétním prohlížeči. Anonymní režim, smazání dat prohlížeče, změna prohlížeče nebo přesunutí/přejmenování HTML souboru mohou znamenat jinou či ztracenou uloženou hru. U `file://` se chování úložiště liší mezi prohlížeči; ponech soubor na stejném místě a pravidelně exportuj zálohu. Pokud prohlížeč ukládání blokuje, hra zobrazí chybu a neodečte mince při neúspěšném zápisu. Poškozený postup automaticky nepřepíše.
 
-## Lokální vývoj
+Hraj ideálně v jedné záložce. Druhá záložka na stejném originu se aktualizuje při změně úložiště, souběžné hraní ale není cílem lokální verze. Původní účty a MySQL data nejsou automaticky migrována.
 
-1. `npm ci` (Node.js 22.12+ nebo 24).
-2. Připrav MySQL/MariaDB databázi s UTF-8. Zkopíruj `app/config.example.php` jako `app/config.local.php`, doplň lokální přístup a `secure_cookies => false` pro HTTP. Nastav dlouhý náhodný `setup_token` (např. výstup `openssl rand -hex 32`). Hodnoty nikam necommituj.
-3. `php -S 127.0.0.1:8080 -t public` (rozšíření pdo_mysql, mbstring, fileinfo).
-4. Otevři lokální `/setup.php`, zadej instalační klíč a vytvoř správce. Instalátor funguje jen v prázdné databázi. Po instalaci odstraň klíč.
-5. `npm run dev` — Vite proxy předává API a uploady PHP serveru.
-6. Přihlas se správcem a v **Správa** nahraj alespoň jednu kartu každé z pěti rarit. Dokud některá chybí, nákupy jsou blokované bez stržení mincí. Vizuální ukázky na úvodu nejsou skutečné karty a nelosují se.
-7. `npm run build` (vyžaduje také nástroj `zip`) vytvoří `dist/` a složku `release/onax/` k nahrání. `npm test` provede integrační testy, pokud běží testovací backend popsaný níže.
+## Pravidla
 
-Uživatelské fotografie z konverzace nejsou automaticky dostupné jako soubory v repozitáři. Nahraj je v administraci, například Onax Original / Common, Onax Neko / Rare, Onax Supreme / Epic, Onax Samurai / Legendary. Pro Mythic lze stejnou fotku použít znovu s jiným názvem. Efekt se řídí zvolenou raritou. Ikona OC je zatím vlastní stylizovaný symbol; dodaný obrázek mince se automaticky nezískal z chatu.
+- Začátek: 100 OC. Balíček: 10 OC, čtyři karty, duplicity povoleny.
+- Denní odměna: 20 OC jednou za kalendářní den v časovém pásmu Europe/Prague podle hodin počítače.
+- Common: 60 % / prodej 1 OC; Rare: 25 % / 2 OC; Epic: 10 % / 4 OC; Legendary: 4 % / 8 OC; Mythic: 1 % / 20 OC.
+- Všechny čtyři karty se uloží hned při nákupu. Obnovením stránky o ně nepřijdeš.
+- V každé raritě musí být alespoň jedna aktivní karta. Výchozí kartu lze vyřadit po přidání jiné stejné rarity. Již získané kusy zůstávají ve sbírce.
+- Fotky: JPG, PNG nebo WebP do 5 MB. Hra je zmenší na nejvýše 1000 px a uloží do zálohy. Velikost postupu je omezená kvůli kapacitě úložiště prohlížeče; při překročení zobrazí chybu.
 
-## Nahrání na školní server přes FileZillu
+Jde o lokální hru pro zábavu. Mince nemají skutečnou hodnotu. Uživatel si může upravit vlastní data či hodiny počítače; žádná serverová ochrana ani společný žebříček tu není.
 
-**Nejjednodušší cesta:** stáhni z GitHubu soubor `onax-filezilla.zip` přes tlačítko Download raw file, rozbal ho a nahraj složku `onax`. Archiv obsahuje sestavený web, PHP backend a příklad konfigurace; nemusíš instalovat Node.js. Potom pokračuj konfigurací databáze v kroku 4.
+## Nahrání na web / XAMPP
 
-1. Ověř PHP **8.2+**, rozšíření **pdo_mysql, mbstring, fileinfo**, MySQL/MariaDB a HTTPS. Pro uploady je potřeba alespoň `upload_max_filesize=5M` a `post_max_size=8M`. Doporučujeme Apache s povoleným `.htaccess`; při jiném serveru musí správce zakázat prohlížení složky `app` a spouštění skriptů v `uploads`.
-2. Vytvoř databázi přes školní panel/phpMyAdmin, případně použij přidělenou. Zjisti host, název databáze, jméno a heslo. Přihlašovací údaje zadávej jen do lokální konfigurace na serveru.
-3. Spusť `npm ci` a `npm run build`. Přes FileZillu nahraj **celou složku `release/onax`**, včetně skrytých `.htaccess` souborů. Zachovej sourozenecké složky `onax/app` a `onax/public`. Web otevřeš na `/onax/public/`. Pokud lze nastavit document root, směruj jej přímo na `onax/public` a `app` ponech mimo veřejný kořen.
-4. Na serveru vytvoř `onax/app/config.local.php` podle příkladu. Nastav databázi, `secure_cookies => true` a jednorázový dlouhý náhodný instalační klíč. Příklad konfigurace je součást balíčku. Nezveřejňuj skutečnou konfiguraci na GitHubu.
-5. Otevři přes **HTTPS** `/onax/public/setup.php`, zadej instalační klíč a vytvoř účet správce s dlouhým heslem. Použij prázdnou databázi. Instalace vytváří tabulky bez prefixu. Pokud instalace selže uprostřed, oprav příčinu podle PHP logu; nepoužívej instalátor na databázi s hráčskými daty.
-6. V konfiguraci nastav `setup_token => ''` a ze serveru smaž `setup.php`. Opakované použití je navíc blokované existující tabulkou uživatelů.
-7. Zajisti zápis PHP do `public/uploads` podle nastavení školního serveru. Nepoužívej bez rozmyslu oprávnění 777. Nahraj karty všech rarit a zkus registraci, denní odměnu, nákup a prodej.
-8. Pravidelně zálohuj **databázi, `public/uploads` a konfiguraci**. Git obsahuje kód, nikoli živé účty a fotky. Při aktualizaci nepřepisuj/smaž konfiguraci ani existující uploady. Nové sestavení neobsahuje nahrané karty; FileZilla nesmí při synchronizaci mazat vzdálené soubory navíc.
+Pokud chceš hru na školním webu nebo přes XAMPP, nahraj pouze rozbalený `index.html` do veřejné složky. Otevři jeho adresu. Není potřeba žádný instalátor ani databáze. Každý návštěvník má svůj vlastní lokální postup. Před přechodem z lokálního souboru na web nebo před změnou adresy proveď export zálohy a na nové adrese ji importuj.
 
-## Bezpečnost a pravidla
+## Vývoj
 
-Hesla jsou hashovaná přes PHP password_hash. API používá session cookie HttpOnly/SameSite, CSRF tokeny, parametrizované SQL a serverovou kontrolu správcovské role. Autentizační požadavky jsou omezené na 30 za 15 minut na IP (ve školní síti je limit sdílený). Obrázky: JPG/PNG/WebP do 5 MB a do 6000 px, ověření obsahu, náhodný název, zákaz skriptů ve složce uploadů.
+Node.js 22.12+ nebo 24, npm a nástroj `zip` pro přípravu archivu:
 
-Nákup i prodej jsou databázové transakce se zamykáním zůstatku; nákup má unikátní klíč proti dvojímu zaplacení při opakování požadavku. Při obnovení stránky jsou všechny koupené karty už ve sbírce. Zůstatek ani výsledek losování neposílá klient. Vyřazení karty ovlivní budoucí losování a nesmaže ji ze sbírek.
+```bash
+npm ci
+npm run dev
+```
 
-Obnova zapomenutého hesla přes e-mail a resetovací UI nejsou součástí první verze (účty nemají e-mail). Správce databáze může nastavit nový hash ručně. Počítej s tím před veřejným spuštěním. Neexistuje platba skutečnými penězi ani obchodování mezi hráči.
+`npm run build` ověří TypeScript, sestaví samostatný offline `dist/index.html` a vytvoří `onax-local.zip`. Písma, JavaScript, CSS a náhradní obrázek jsou uvnitř HTML, nestahují se z internetu. Archiv neobsahuje účty, lokální postup ani testovací data.
 
-## Integrační testy
+```bash
+npm test
+npm run test:browser
+```
 
-`tests/api.test.mjs` testuje skutečné PHP API a MySQL/MariaDB: registraci, CSRF, denní odměnu, správu karet, nákup, opakovaný nákup, prodej, cizí vlastnictví a přihlášení. Běží nad novou testovací databází. Parametry `ONAX_TEST_URL`, `ONAX_TEST_ADMIN`, `ONAX_TEST_PASSWORD` nastav jen pro testovacího správce. Testy vytvářejí a mění testovací data; nikdy je nespouštěj proti produkci.
-
-Pro prohlížečové ověření: `npm run test:browser`. Vyžaduje Chromium (`CHROMIUM_PATH`, výchozí `/usr/bin/chromium`), backend na portu 8080 a `.test-data/admin.json` s účtem **testovacího** správce. Test zaregistruje nové hráče a nakupuje/prodává karty.
+Jednotkové testy ověřují ekonomiku, denní odměnu, přesné poměry rarit, zálohy, neplatné importy a chyby úložiště. Prohlížečový test po sestavení používá Chromium (`CHROMIUM_PATH`, výchozí `/usr/bin/chromium`) a otevírá skutečný `dist/index.html` přes `file://`. Není třeba spouštět PHP ani jiný server.

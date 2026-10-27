@@ -1,11 +1,8 @@
 import { defineConfig } from "vite";
+import { viteSingleFile } from "vite-plugin-singlefile";
 export default defineConfig({
   base: "./",
-  build: { target: "es2022" },
-  server: {
-    proxy: {
-      "/api.php": "http://127.0.0.1:8080",
-      "/uploads": "http://127.0.0.1:8080",
-    },
-  },
+  plugins: [viteSingleFile()],
+  publicDir: false,
+  build: { target: "es2022", assetsInlineLimit: 10000000 },
 });
