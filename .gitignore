@@ -8,3 +8,6 @@ public/uploads/*
 .test-data/
 playwright-report/
 test-results/
+
+src/data/default-cards.json
+src/data/default-cards.json.tmp

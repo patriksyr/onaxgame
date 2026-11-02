@@ -1,14 +1,20 @@
 {
   "name": "roll-an-onax",
-  "version": "2.1.1",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit && vite build && node scripts/package.mjs",
-    "test": "node --import tsx --test tests/local.test.ts",
+    "test": "node --import tsx --test tests/local.test.ts tests/catalog.test.mjs",
     "test:browser": "node tests/browser.mjs",
-    "format": "prettier --write src tests scripts/*.mjs *.json *.ts index.html README.md"
+    "format": "prettier --write src tests scripts/*.mjs *.json *.ts index.html README.md",
+    "catalog:build": "node scripts/catalog.mjs",
+    "card:add": "node scripts/add-card.mjs",
+    "predev": "npm run catalog:build",
+    "prebuild": "npm run catalog:build",
+    "pretest": "npm run catalog:build",
+    "postinstall": "npm run catalog:build"
   },
   "dependencies": {
     "@fontsource/barlow-condensed": "^5.3.0",

@@ -10,7 +10,7 @@ const browser = await chromium.launch({
 });
 const url = pathToFileURL(resolve("dist/index.html")).href;
 const errors = [],
-  network = [];
+  requests = [];
 async function profile(roll = 0.2, reduced = true) {
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
@@ -28,227 +28,283 @@ async function profile(roll = 0.2, reduced = true) {
   const page = await context.newPage();
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("request", (r) => {
-    if (/^https?:/.test(r.url())) network.push(r.url());
+    if (/^https?:/.test(r.url())) requests.push(r.url());
   });
+  page.on("dialog", (d) => d.accept());
   await page.goto(url);
   await page.locator(".balance").waitFor();
   return page;
 }
-const count = (page) =>
-  page.evaluate(
-    () =>
-      JSON.parse(localStorage.getItem("roll-an-onax-local-v1")).inventory
-        .length,
-  );
-async function pack(page) {
-  await page.locator("[data-action=buy]").first().click();
-  await page.locator("[data-action=confirm-buy]").click();
+const save = (p) =>
+  p.evaluate(() => JSON.parse(localStorage.getItem("roll-an-onax-local-v1")));
+async function rich(p) {
+  await p.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem("roll-an-onax-local-v1"));
+    s.coins = 1000;
+    localStorage.setItem("roll-an-onax-local-v1", JSON.stringify(s));
+  });
+  await p.reload();
+  await p.locator(".balance").waitFor();
+}
+async function open(p, pack = "origins", count = 1) {
+  await p.locator("[data-action=buy]").first().click();
+  await p.locator(`[data-select-pack=${pack}]`).click();
+  await p.locator(`[data-select-count="${count}"]`).click();
+  await p.locator("[data-action=confirm-buy]").click();
+}
+async function result(p) {
+  await p.locator(".batch-result").waitFor({ timeout: 10000 });
 }
 try {
   await mkdir(".test-data", { recursive: true });
-  const page = await profile();
-  assert.match(await page.locator(".balance").textContent(), /100/);
-  assert.equal(await page.locator(".connection-banner").count(), 0);
+  const p = await profile();
+  assert.equal((await save(p)).catalog.length, 10);
+  assert.equal((await save(p)).coins, 100);
+  await p.screenshot({ path: ".test-data/universe-home.png", fullPage: true });
+  await p.getByRole("link", { name: "Karty", exact: true }).click();
+  await p.locator("#catalog").waitFor();
+  assert.equal(await p.locator(".locked-card").count(), 10);
+  assert.equal(await p.locator("#catalog img").count(), 0);
   assert.equal(
-    await page.evaluate(
-      () =>
-        JSON.parse(localStorage.getItem("roll-an-onax-local-v1")).catalog
-          .length,
-    ),
-    10,
+    await p
+      .locator("#catalog")
+      .getByText("ABSOLUTNÍ ONAX", { exact: true })
+      .count(),
+    0,
   );
-  await page.waitForFunction(() => {
-    const img = document.querySelector(".hero-card img");
-    return img?.complete && img.naturalWidth > 0;
-  });
-  await page.screenshot({
-    path: ".test-data/purple-desktop.png",
+  assert.equal(
+    await p.locator("#card-form,[data-toggle],input[name=name]").count(),
+    0,
+  );
+  await p.screenshot({
+    path: ".test-data/universe-index-locked.png",
     fullPage: true,
   });
-  await pack(page);
-  await page.locator(".result-view").waitFor();
-  assert.equal(await count(page), 1);
-  assert.match(await page.locator(".balance").textContent(), /90/);
-  assert.equal(await page.locator(".result-card .onax-card").count(), 1);
-  await page.locator("[data-action=again]").click();
-  await page.locator(".result-view").waitFor();
-  assert.equal(await count(page), 2);
-  assert.match(await page.locator(".balance").textContent(), /80/);
-  await page.locator("[data-action=sell-again]").click();
-  await page.locator(".result-view").waitFor();
-  assert.equal(await count(page), 2);
-  assert.match(await page.locator(".balance").textContent(), /71/);
-  await page.locator("[data-action=sell-result]").click();
-  await page
-    .locator("[data-action=sell-result]")
-    .waitFor({ state: "detached" });
-  assert.equal(await count(page), 1);
-  assert.match(await page.locator(".balance").textContent(), /72/);
-  await page.keyboard.press("Escape");
-  await page.locator("#modal").waitFor({ state: "hidden" });
-  await page.getByRole("link", { name: "Moje sbírka", exact: true }).click();
-  await page.locator(".owned-card").waitFor();
-  assert.equal(await page.locator(".owned-card").count(), 1);
-  await pack(page);
-  await page.locator(".result-view").waitFor();
-  await page.mouse.click(5, 5);
-  await page.locator("#modal").waitFor({ state: "hidden" });
-  assert.equal(await page.locator(".owned-card").count(), 2);
-  await page.reload();
-  await page.locator(".owned-card").first().waitFor();
-  assert.equal(await page.locator(".owned-card").count(), 2);
-  await page.getByRole("link", { name: "Balíčky", exact: true }).click();
-  await page.getByRole("button", { name: /Vyzvednout 20 mincí/ }).click();
-  await page.getByRole("button", { name: /Dnes vyzvednuto/ }).waitFor();
-  assert.ok(
-    await page.getByRole("button", { name: /Dnes vyzvednuto/ }).isDisabled(),
+  await open(p, "origins", 4);
+  await result(p);
+  assert.equal(await p.locator(".batch-item").count(), 4);
+  assert.equal((await save(p)).inventory.length, 4);
+  assert.equal((await save(p)).coins, 0);
+  assert.equal((await save(p)).discovered.length, 1);
+  await p.screenshot({ path: ".test-data/universe-results4.png" });
+  await p.locator("[data-result-sell]").first().click();
+  await p.locator(".batch-item.is-sold").waitFor();
+  assert.equal((await save(p)).coins, 10);
+  await p.locator("[data-action=sell-result]").click();
+  await p.waitForFunction(
+    () =>
+      JSON.parse(localStorage.getItem("roll-an-onax-local-v1")).inventory
+        .length === 0,
   );
-  await page.getByRole("link", { name: "Karty", exact: true }).click();
-  await page.locator("[name=name]").fill("Můj <b>Onax</b>");
-  await page.locator("[name=rarity]").selectOption("mythic");
-  assert.equal(await page.locator("#admin-preview h3 b").count(), 0);
-  const image = await page.evaluate(() => {
-    const c = document.createElement("canvas");
-    c.width = 10;
-    c.height = 10;
-    c.getContext("2d").fillRect(0, 0, 10, 10);
-    return c.toDataURL("image/png").split(",")[1];
-  });
-  const file = {
-    name: "onax.png",
-    mimeType: "image/png",
-    buffer: Buffer.from(image, "base64"),
-  };
-  await page.locator("[name=image]").setInputFiles(file);
-  await page.locator("#card-form button").click();
-  await page.getByText("Můj <b>Onax</b>", { exact: true }).waitFor();
-  await page.getByRole("button", { name: "Záloha a nastavení" }).click();
-  await page.locator("#coin-file").setInputFiles(file);
-  await page.locator("[data-action=coin-image]").click();
-  await page.locator("#modal").waitFor({ state: "hidden" });
-  assert.equal(await page.locator(".balance .coin img").count(), 1);
-  await page.getByRole("button", { name: "Záloha a nastavení" }).click();
-  const downloading = page.waitForEvent("download");
-  await page.locator("[data-action=export]").click();
+  assert.equal((await save(p)).coins, 40);
+  assert.ok(await p.locator("[data-action=sell-result]").isDisabled());
+  await p.keyboard.press("Escape");
+  await p.locator("#catalog").waitFor();
+  assert.equal(await p.locator(".locked-card").count(), 9);
+  assert.equal(await p.locator("[data-catalog-detail]").count(), 1);
+  const snapshot = await save(p);
+  const revealed = snapshot.catalog.find(
+    (c) => c.id === snapshot.discovered[0],
+  );
+  await p.locator("[data-catalog-detail]").click();
+  await p.locator(".card-detail").waitFor();
+  assert.equal(
+    await p.locator(".full-description").textContent(),
+    revealed.description,
+  );
+  assert.equal(await p.locator("[data-detail-sell]").count(), 0);
+  await p.screenshot({ path: ".test-data/universe-detail.png" });
+  await p.keyboard.press("Escape");
+  await p.reload();
+  await p.locator("[data-catalog-detail]").waitFor();
+  assert.equal(await p.locator(".locked-card").count(), 9);
+  await p.getByRole("link", { name: "Balíčky", exact: true }).click();
+  await p.getByRole("button", { name: /Vyzvednout 50 mincí/ }).click();
+  await p.getByRole("button", { name: /Dnes vyzvednuto/ }).waitFor();
+  assert.equal((await save(p)).coins, 90);
+  await open(p, "boost", 2);
+  await result(p);
+  assert.equal((await save(p)).coins, 10);
+  assert.equal((await save(p)).inventory.length, 2);
+  await p.locator("[data-action=sell-result]").click();
+  await p.waitForFunction(
+    () =>
+      JSON.parse(localStorage.getItem("roll-an-onax-local-v1")).inventory
+        .length === 0,
+  );
+  assert.equal((await save(p)).coins, 30);
+  await p.keyboard.press("Escape");
+  await p.getByRole("link", { name: "Moje sbírka", exact: true }).click();
+  await open(p, "origins", 1);
+  await result(p);
+  assert.equal((await save(p)).coins, 5);
+  await p.locator("[data-action=to-collection]").click();
+  await p.locator(".owned-card").waitFor();
+  await p.locator("[data-detail]").click();
+  await p.locator(".full-description").waitFor();
+  assert.equal(
+    await p.locator(".full-description").textContent(),
+    revealed.description,
+  );
+  await p.locator("[data-detail-sell]").click();
+  await p.locator("#modal").waitFor({ state: "hidden" });
+  assert.equal((await save(p)).coins, 15);
+  assert.equal((await save(p)).inventory.length, 0);
+  // Export a restore nesmí vrátit veřejnou správu či podvržený katalog.
+  await p.getByRole("button", { name: "Záloha a nastavení" }).click();
+  assert.equal(await p.locator("[data-action=import-catalog]").count(), 0);
+  const downloading = p.waitForEvent("download");
+  await p.locator("[data-action=export]").click();
   const raw = await readFile(await (await downloading).path(), "utf8");
-  const saved = JSON.parse(raw);
-  assert.equal(saved.inventory.length, 2);
-  assert.equal(saved.catalog.length, 11);
-  assert.ok(saved.coinImage.startsWith("data:image/jpeg;"));
-  page.on("dialog", (d) => d.accept());
-  await page.locator("[data-action=reset]").click();
-  await page.locator("#modal").waitFor({ state: "hidden" });
-  assert.match(await page.locator(".balance").textContent(), /100/);
-  await page.getByRole("button", { name: "Záloha a nastavení" }).click();
-  await page.locator("#import-file").setInputFiles({
-    name: "backup.json",
-    mimeType: "application/json",
-    buffer: Buffer.from(raw),
-  });
-  await page.locator("[data-action=import]").click();
-  await page.locator("#modal").waitFor({ state: "hidden" });
-  assert.equal(await count(page), 2);
-  // Samotný katalog ze stejné zálohy nesmí změnit peníze ani sbírku.
-  await page.getByRole("button", { name: "Záloha a nastavení" }).click();
-  await page.locator("#import-file").setInputFiles({
-    name: "backup.json",
-    mimeType: "application/json",
-    buffer: Buffer.from(raw),
-  });
-  await page.locator("[data-action=import-catalog]").click();
-  await page.locator("#modal").waitFor({ state: "hidden" });
-  assert.equal(await count(page), 2);
-  assert.match(
-    await page.locator(".balance").textContent(),
-    new RegExp(String(saved.coins)),
-  );
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("link", { name: "Moje sbírka", exact: true }).click();
-  await page.locator(".owned-card").first().waitFor();
+  const modified = JSON.parse(raw);
+  modified.catalog[0].name = "PODVRŽENÝ KATALOG";
+  modified.catalog[0].active = 0;
+  modified.catalog[0].price = 99999;
+  await p
+    .locator("#import-file")
+    .setInputFiles({
+      name: "backup.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(modified)),
+    });
+  await p.locator("[data-action=import]").click();
+  await p.locator("#modal").waitFor({ state: "hidden" });
   assert.ok(
-    await page.evaluate(
+    !(await save(p)).catalog.some((c) => c.name === "PODVRŽENÝ KATALOG"),
+  );
+  assert.equal((await save(p)).coins, 15);
+  assert.equal((await save(p)).discovered.length, 1);
+  // Migrace reálného tvaru původní zálohy se čtyřmi kartami.
+  const legacy = await profile();
+  await legacy.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem("roll-an-onax-local-v1"));
+    s.version = 1;
+    delete s.discovered;
+    s.coins = 73;
+    s.lastDaily = "2026-11-01";
+    s.inventory = Array.from({ length: 4 }, (_, i) => ({
+      ...s.catalog[0],
+      inventory_id: i + 1,
+      price: 1,
+    }));
+    s.nextInventoryId = 5;
+    localStorage.setItem("roll-an-onax-local-v1", JSON.stringify(s));
+  });
+  await legacy.reload();
+  await legacy.getByRole("link", { name: "Moje sbírka", exact: true }).click();
+  await legacy.locator(".owned-card").first().waitFor();
+  assert.equal(await legacy.locator(".owned-card").count(), 4);
+  assert.equal((await save(legacy)).coins, 73);
+  assert.equal((await save(legacy)).discovered.length, 1);
+  // Čtyři plné pásy jsou viditelné a skutečně se posouvají současně; Apex special se odhalí jednou.
+  const multi = await profile(0.995, false);
+  await rich(multi);
+  await open(multi, "apex", 4);
+  await multi.locator(".multi-roll").waitFor();
+  assert.equal(await multi.locator(".reel-track").count(), 4);
+  const before = await multi
+    .locator(".reel-track")
+    .evaluateAll((es) => es.map((e) => getComputedStyle(e).transform));
+  await multi.waitForTimeout(300);
+  const after = await multi
+    .locator(".reel-track")
+    .evaluateAll((es) => es.map((e) => getComputedStyle(e).transform));
+  assert.ok(after.every((t, i) => t !== before[i]));
+  assert.equal(
+    await multi.locator(".reel-tile.legendary,.reel-tile.mythic").count(),
+    0,
+  );
+  for (let i = 0; i < 4; i++)
+    assert.match(
+      await multi
+        .locator(`[data-lane="${i}"] .reel-tile`)
+        .nth(40)
+        .textContent(),
+      /TAJEMNÝ ONAX/,
+    );
+  await multi.screenshot({ path: ".test-data/universe-roll4.png" });
+  await multi.locator("[data-action=skip-roll]").click();
+  await multi.locator(".rare-cinematic").waitFor();
+  assert.equal(await multi.locator(".rare-cinematic").count(), 1);
+  await result(multi);
+  assert.equal(await multi.locator(".batch-item .mythic").count(), 4);
+  assert.equal((await save(multi)).coins, 660);
+  assert.equal((await save(multi)).inventory.length, 4);
+  await multi.locator("[data-action=sell-again]").click();
+  await multi.locator(".multi-roll").waitFor();
+  assert.equal((await save(multi)).coins, 920);
+  assert.equal((await save(multi)).inventory.length, 4);
+  await multi.keyboard.press("Escape");
+  await multi.waitForTimeout(5100);
+  assert.equal(await multi.locator("#modal[open]").count(), 0);
+  // Desktop i mobil; čtyři kompaktní pásy se vejdou do dialogu současně.
+  const mobile = await profile(0.2, false);
+  await rich(mobile);
+  await mobile.setViewportSize({ width: 390, height: 844 });
+  await mobile.getByRole("link", { name: "Karty", exact: true }).click();
+  await mobile.screenshot({
+    path: ".test-data/universe-mobile-index.png",
+    fullPage: true,
+  });
+  assert.ok(
+    await mobile.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   );
-  await page.screenshot({
-    path: ".test-data/purple-mobile-collection.png",
+  await open(mobile, "elite", 4);
+  await mobile.locator(".multi-roll").waitFor();
+  assert.equal(await mobile.locator(".reel-track").count(), 4);
+  assert.ok(
+    await mobile
+      .locator(".reel-window")
+      .evaluateAll((es) =>
+        es.every(
+          (e) =>
+            e.getBoundingClientRect().top >= 0 &&
+            e.getBoundingClientRect().bottom <= innerHeight,
+        ),
+      ),
+  );
+  await mobile.screenshot({ path: ".test-data/universe-mobile-roll4.png" });
+  await mobile.locator("[data-action=skip-roll]").click();
+  await result(mobile);
+  assert.equal(await mobile.locator(".batch-item").count(), 4);
+  await mobile.screenshot({ path: ".test-data/universe-mobile-results.png" });
+  await mobile.keyboard.press("Escape");
+  await mobile.getByRole("link", { name: "Moje sbírka", exact: true }).click();
+  await mobile.locator("[data-detail]").first().click();
+  await mobile.locator(".full-description").waitFor();
+  await mobile.screenshot({
+    path: ".test-data/universe-mobile-detail.png",
     fullPage: true,
   });
-  await pack(page);
-  await page.locator(".result-view").waitFor();
-  await page.screenshot({ path: ".test-data/purple-mobile-result.png" });
-  await page.keyboard.press("Escape");
-  const other = await profile();
-  other.on("dialog", (d) => d.accept());
-  await other.getByRole("button", { name: "Záloha a nastavení" }).click();
-  await other.locator("#import-file").setInputFiles({
-    name: "backup.json",
-    mimeType: "application/json",
-    buffer: Buffer.from(raw),
-  });
-  await other.locator("[data-action=import]").click();
-  await other.locator("#modal").waitFor({ state: "hidden" });
-  assert.equal(await count(other), 2);
-  // Obě nejvyšší rarity na pásu používají pouze tutéž anonymní ikonu.
-  for (const [roll, rarity] of [
-    [0.97, "legendary"],
-    [0.995, "mythic"],
-  ]) {
-    const p = await profile(roll, false);
-    await pack(p);
-    await p.locator(".roll-view").waitFor();
-    assert.match(
-      await p.locator(".reel-tile").nth(40).textContent(),
-      /TAJEMNÝ ONAX/,
-    );
-    assert.equal(
-      await p.locator(".reel-tile.legendary,.reel-tile.mythic").count(),
-      0,
-    );
-    assert.equal(
-      await p.locator('.roll-view img[alt="Onax Samurai"]').count(),
-      0,
-    );
-    await p.screenshot({ path: `.test-data/reel-${rarity}.png` });
-    await p.locator(".rare-cinematic").waitFor({ timeout: 9000 });
-    assert.ok(
-      await p
-        .locator(".rare-cinematic")
-        .evaluate((e) => e.getBoundingClientRect().height >= innerHeight),
-    );
-    await p.screenshot({ path: `.test-data/cinematic-${rarity}.png` });
-    await p.locator(`.result-view.${rarity}`).waitFor({ timeout: 5000 });
-    await p.screenshot({ path: `.test-data/result-${rarity}.png` });
-    assert.equal(await count(p), 1);
-  }
-  const cancelled = await profile(0.2, false);
-  await pack(cancelled);
-  await cancelled.locator(".roll-view").waitFor();
-  await cancelled.keyboard.press("Escape");
-  await cancelled.locator("#modal").waitFor({ state: "hidden" });
-  await cancelled.waitForTimeout(5100);
-  assert.equal(await cancelled.locator("#modal[open]").count(), 0);
-  assert.equal(await count(cancelled), 1);
-  assert.match(await cancelled.locator(".balance").textContent(), /90/);
-  const blocked = await browser.newContext();
-  await blocked.addInitScript(() => {
-    Storage.prototype.setItem = function () {
+  assert.ok(
+    await mobile.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  );
+  await mobile.mouse.click(2, 2);
+  await mobile.locator("#modal").waitFor({ state: "hidden" });
+  // Chyba úložiště nezaplatí ani část dávky.
+  const blockedContext = await browser.newContext();
+  await blockedContext.addInitScript(() => {
+    Storage.prototype.setItem = () => {
       throw new DOMException("Quota exceeded", "QuotaExceededError");
     };
   });
-  const p3 = await blocked.newPage();
-  await p3.goto(url);
-  await p3.locator(".connection-banner").waitFor();
-  await pack(p3);
-  await p3
+  const blocked = await blockedContext.newPage();
+  await blocked.goto(url);
+  await blocked.locator(".connection-banner").waitFor();
+  await open(blocked, "origins", 4);
+  await blocked
     .locator(".form-error")
     .filter({ hasText: "nepodařilo uložit" })
     .waitFor();
-  assert.match(await p3.locator(".balance").textContent(), /100/);
+  assert.match(await blocked.locator(".balance").textContent(), /100/);
   assert.deepEqual(errors, []);
-  assert.deepEqual(network, []);
+  assert.deepEqual(requests, []);
   console.log(
-    "PASS: offline, jeden Onax, prodat/točit/nechat, kolekce, Escape a backdrop, zrušení animace, oba tajné symboly a filmové odhalení, mobil, staré zálohy, katalog, mince, kvóta.",
+    "PASS: offline, zamčený katalog, detaily, trvalé objevy, všechny balíčky, 4 souběžné pásy, hromadný prodej a další dávka, migrace, autorita katalogu při importu, mobil, kvóta.",
   );
 } finally {
   await browser.close();

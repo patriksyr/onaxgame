@@ -1,57 +1,55 @@
-# Roll an Onax — lokální verze
+# Roll an Onax — Universe Edition
 
-Česká sběratelská hra bez účtů, hesel, PHP, MySQL a instalace. Mince, sbírka i vlastní karty se ukládají do localStorage v prohlížeči.
+Česká offline sběratelská hra. Bez účtů a databáze; mince, sbírka a objevy se ukládají v prohlížeči. Katalog vydává pouze autor webu ze zdrojového projektu. Veřejný web nemá vytváření, úpravy, vyřazování ani import katalogu.
 
-## Jak hrát na libovolném PC
+## Spuštění a aktualizace
 
-1. Z GitHubu stáhni **[onax-local.zip](https://github.com/patriksyr/onaxgame/raw/refs/heads/main/onax-local.zip)** (případně tlačítkem Download raw file).
-2. ZIP nejprve rozbal. Ve složce `onax` otevři **`index.html`** v aktuálním Firefoxu, Chrome nebo Edge. Funguje i offline, bez XAMPP a bez terminálu.
-3. Dostaneš 100 Onaxcoinů a můžeš rovnou otevřít balíček. Hra už obsahuje 10 vlastních Onaxů s fotkami z dodané zálohy. V **Karty** můžeš přidat další fotky, názvy, popisy a rarity. Není potřeba nic ručně importovat.
-4. Přes ozubené kolečko vpravo nahoře zvol **Stáhnout zálohu**. Záloha obsahuje celý postup i obrázky. Na jiném PC ji nahraj přes **Obnovit celý postup**.
+Stáhni **[onax-local.zip](https://github.com/patriksyr/onaxgame/raw/refs/heads/main/onax-local.zip)**, rozbal ho a otevři `onax/index.html`. Na školní server nahraj pouze `index.html` z tohoto archivu, případně `dist/index.html` ze svého sestavení. Zachovej původní adresu webu. Není potřeba PHP, MySQL ani XAMPP.
 
-**Důležité:** postup není v HTML souboru ani na GitHubu. Je v konkrétním prohlížeči. Anonymní režim, smazání dat prohlížeče, změna prohlížeče nebo přesunutí/přejmenování HTML souboru mohou znamenat jinou či ztracenou uloženou hru. U `file://` se chování úložiště liší mezi prohlížeči; ponech soubor na stejném místě a pravidelně exportuj zálohu. Pokud prohlížeč ukládání blokuje, hra zobrazí chybu a neodečte mince při neúspěšném zápisu. Poškozený postup automaticky nepřepíše.
+**Před aktualizací exportuj zálohu** přes ozubené kolečko. Uložené mince a sbírka se zachovají, staré ceny se přepočtou na nové a vlastněné oficiální karty se označí jako objevené. Starší verze nesledovala už prodané karty: tyto dávno prodané objevy nelze zpětně zjistit. Od této verze objevení zůstává i po prodeji. Dříve vytvořené osobní karty zůstanou archivními kusy ve sbírce, ale nevstupují do veřejného katalogu ani losování.
 
-Hraj ideálně v jedné záložce. Druhá záložka na stejném originu se aktualizuje při změně úložiště, souběžné hraní ale není cílem lokální verze. Původní účty a MySQL data nejsou automaticky migrována.
+Obnovení zálohy přenáší postup, nikoli vlastní katalog. Vždy platí oficiální karty z aktuálního vydání. Nové oficiální karty se po aktualizaci objeví automaticky jako neobjevené. Zachovávej jejich ID; pravidla pro autora jsou v **[KARTY.md](KARTY.md)**.
 
-## Nové otevírání a přenos vlastních karet
+Postup patří konkrétnímu prohlížeči a adrese webu. Smazání jeho dat, anonymní režim, přesun HTML nebo změna adresy může data odstranit či zpřístupnit jiný postup. Pravidelně exportuj zálohu. Hraj ideálně v jedné záložce.
 
-Po roztržení balíčku běží pás karet s pevnou středovou značkou a postupně zpomaluje. Legendary a Mythic se na pásu nikdy neukazují jako skutečné karty: obě rarity zastupuje stejný zlatý symbol. Jeho výhra spustí zatemnění obrazovky, částice a samostatné odhalení karty. Animaci pásu lze přeskočit; nastavení omezeného pohybu v systému zkrátí efekty.
+## Balíčky a ekonomika
 
-Ve výsledku můžeš **Nechat a točit**, **Prodat a točit** nebo **Jen prodat**. Křížek, Escape a kliknutí mimo okno ho zavřou; neprodaný Onax už je ve sbírce. Další balíček otevřeš také tlačítkem přímo ve sbírce. Pokud nestačí mince, zůstávají dostupné prodej a denní odměna.
+Začínáš se **100 OC**, denní odměna je **50 OC**, jednou za kalendářní den v pásmu Europe/Prague podle hodin počítače.
 
-Starší JSON zálohy z verze se čtyřmi kartami jsou kompatibilní. V nastavení nahraj soubor a vyber **Načíst jen karty**, pokud chceš nahradit katalog a zachovat současné mince i sbírku; **Obnovit celý postup** nahradí vše. Vlastní fotku mince přidáš přes **Vlastní obrázek Onaxcoinu → Uložit obrázek mince**. Je zahrnuta do exportu. Výchozí katalog obsahuje všech 10 aktivních vlastních karet z dodané JSON zálohy; původních pět vyřazených náhledů vynechává. Mince, denní odměna ani sbírka autora se nepřebírají. Nová hra začíná se 100 OC a prázdnou sbírkou. Instalace, která má dosud jen původních pět náhledů, se aktualizuje automaticky při zachování získaných karet a mincí. Vlastní upravené katalogy se nepřepisují.
+| Balíček |  Cena | Common | Rare | Epic | Legendary | Mythic |
+| ------- | ----: | -----: | ---: | ---: | --------: | -----: |
+| Origins | 25 OC |   60 % | 25 % | 10 % |       4 % |    1 % |
+| Boost   | 40 OC |   35 % | 35 % | 20 % |       8 % |    2 % |
+| Elite   | 67 OC |   10 % | 25 % | 40 % |      20 % |    5 % |
+| Apex    | 85 OC |    0 % | 10 % | 40 % |      35 % |   15 % |
 
-Před aktualizací si ve staré verzi exportuj zálohu. Novým HTML můžeš nahradit starý soubor na stejném místě; pokud prohlížeč původní data nenajde, použij import.
+Prodej: **Common 10 / Rare 15 / Epic 20 / Legendary 100 / Mythic 150 OC**. Průměrná prodejní hodnota úlovku je 17,25 / 26,75 / 40,25 / 67 OC podle typu balíčku, tedy méně než jeho cena.
 
-## Pravidla
+Otevři **1, 2 nebo 4 stejné balíčky současně**. Každý obsahuje jednoho Onaxe, duplicity jsou možné a karty stejné rarity mají stejnou šanci. Nákup se uloží celý před animací; nedostatek peněz nebo chyba úložiště nestrhne část platby. Všechny pásy běží zároveň. Legendary a Mythic jsou skryté za stejnou zlatou ikonou a mají jedno společné slavnostní odhalení. Systémové nastavení omezeného pohybu zkrátí animace.
 
-- Začátek: 100 OC. Balíček: 10 OC, jeden Onax; stejného můžeš získat opakovaně.
-- Denní odměna: 20 OC jednou za kalendářní den v časovém pásmu Europe/Prague podle hodin počítače.
-- Common: 60 % / prodej 1 OC; Rare: 25 % / 2 OC; Epic: 10 % / 4 OC; Legendary: 4 % / 8 OC; Mythic: 1 % / 20 OC.
-- Onax se uloží hned při nákupu, ještě před animací. Zavřením animace ani obnovením stránky o něj nepřijdeš.
-- V každé raritě musí být alespoň jedna aktivní karta. Výchozí kartu lze vyřadit po přidání jiné stejné rarity. Již získané kusy zůstávají ve sbírce.
-- Fotky: JPG, PNG nebo WebP do 5 MB. Hra je zmenší na nejvýše 1000 px a uloží do zálohy. Velikost postupu je omezená kvůli kapacitě úložiště prohlížeče; při překročení zobrazí chybu.
+Výsledky umožňují prodat jednotlivé kusy, všechny zbývající nebo prodat a točit znovu. Zavření křížkem, Escape či kliknutím mimo nechá neprodané karty ve sbírce.
 
-Jde o lokální hru pro zábavu. Mince nemají skutečnou hodnotu. Uživatel si může upravit vlastní data či hodiny počítače; žádná serverová ochrana ani společný žebříček tu není.
+## Sbírka a index
 
-## Nahrání na web / XAMPP
+Ve **sbírce** klikni na kartu pro její velké zobrazení, celý popis, raritu, cenu a počet vlastněných kusů. Veřejné **Karty** jsou index: neobjevení Onaxové mají siluetu a raritu, po prvním získání se odkryjí natrvalo. Detail je dostupný i z objevené položky indexu.
 
-Pokud chceš hru na školním webu nebo přes XAMPP, nahraj pouze rozbalený `index.html` do veřejné složky. Otevři jeho adresu. Není potřeba žádný instalátor ani databáze. Každý návštěvník má svůj vlastní lokální postup. Před přechodem z lokálního souboru na web nebo před změnou adresy proveď export zálohy a na nové adrese ji importuj.
+Hra je lokální zábava, ne zabezpečená soutěž. Návštěvník s technickými znalostmi může změnit vlastní data v prohlížeči; neovlivní tím jiné hráče ani soubory serveru. Skutečná ochrana peněz či společný žebříček by vyžadovaly backend. Mince nemají skutečnou hodnotu.
 
 ## Vývoj
 
-Node.js 22.12+ nebo 24, npm a nástroj `zip` pro přípravu archivu:
+Node.js 22.12+ nebo 24, npm a `zip`:
 
 ```bash
 npm ci
 npm run dev
 ```
 
-`npm run build` ověří TypeScript, sestaví samostatný offline `dist/index.html` a vytvoří `onax-local.zip`. Písma, JavaScript, CSS a náhradní obrázek jsou uvnitř HTML, nestahují se z internetu. Archiv neobsahuje účty, lokální postup ani testovací data.
+Katalog upravuj v `content/cards.json`, fotky patří do `content/images/`. Výchozí fotky jsou součástí projektu. Pomocník `npm run card:add` přidá další. `npm run catalog:build` obnoví generovaný manifest pro běžící Vite; `dev`, `build` i `test` ho připraví automaticky před spuštěním.
 
 ```bash
 npm test
+npm run build
 npm run test:browser
 ```
 
-Jednotkové testy ověřují ekonomiku, denní odměnu, přesné poměry rarit, zálohy, neplatné importy a chyby úložiště. Prohlížečový test po sestavení používá Chromium (`CHROMIUM_PATH`, výchozí `/usr/bin/chromium`) a otevírá skutečný `dist/index.html` přes `file://`. Není třeba spouštět PHP ani jiný server.
+Sestavení vytvoří samostatný offline `dist/index.html` a `onax-local.zip`. JavaScript, CSS, písma a obrázky jsou uvnitř HTML. Generovaný `src/data/default-cards.json` se necommituje. Testy ověřují šance všech balíčků, atomické nákupy a prodeje, objevování, migraci záloh, autoritativní katalog, chyby úložiště a autorského pomocníka. Prohlížečový test používá Chromium (`CHROMIUM_PATH`, výchozí `/usr/bin/chromium`) a skutečné `file://` bez serveru.

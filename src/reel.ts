@@ -1,4 +1,4 @@
-import type { Card } from "./local-game";
+import { PACKS, drawRarity, type PackId, type Card } from "./local-game";
 export const isSpecial = (card: Card) =>
   card.rarity === "legendary" || card.rarity === "mythic";
 export type ReelItem = { kind: "special" } | { kind: "card"; card: Card };
@@ -10,6 +10,7 @@ export function createReel(
   catalog: Card[],
   winner: Card,
   random = Math.random,
+  packId: PackId = "origins",
 ): { items: ReelItem[]; winningIndex: number } {
   const active = catalog.filter((c) => c.active);
   const items: ReelItem[] = [];
@@ -19,16 +20,8 @@ export function createReel(
       items.push(reelItem(winner));
       continue;
     }
-    const roll = random() * 100;
-    const rarity =
-      roll < 60
-        ? "common"
-        : roll < 85
-          ? "rare"
-          : roll < 95
-            ? "epic"
-            : "special";
-    if (rarity === "special") {
+    const rarity = drawRarity(PACKS[packId].chances, random());
+    if (rarity === "legendary" || rarity === "mythic") {
       items.push({ kind: "special" });
       continue;
     }

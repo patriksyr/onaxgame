@@ -1,0 +1,82 @@
+[
+  {
+    "id": 6,
+    "name": "okamuranax",
+    "description": "Okamuranax je legendární bojovník, který ovládá starobylé umění nekonečného politického monologu. Jeho čelenka mu poskytuje imunitu proti přerušování a jeho katana dokáže přeseknout i schválený státní rozpočet. Je připraven bránit české hranice před čímkoliv, včetně špatného počasí.",
+    "rarity": "epic",
+    "active": 1,
+    "image": "images/onax-6.jpg"
+  },
+  {
+    "id": 7,
+    "name": "ABSOLUTNÍ ONAX",
+    "description": "Absolutní Onax není člověk. Je to stav mysli. Když vstoupí do místnosti, všichni automaticky ztichnou, protože vědí, že právě dorazila definitivní odpověď na otázku, kterou nikdo nepoložil. Dokáže se mýlit s takovou jistotou, že začne pochybovat i samotná realita.",
+    "rarity": "mythic",
+    "active": 1,
+    "image": "images/onax-7.jpg"
+  },
+  {
+    "id": 8,
+    "name": "EPSTEINNAX",
+    "description": "Epsteinnax je nejzáhadnější postavou celého multivesmíru. Vlastní soukromý ostrov, tři letadla a telefonní seznam.",
+    "rarity": "legendary",
+    "active": 1,
+    "image": "images/onax-8.jpg"
+  },
+  {
+    "id": 9,
+    "name": "KIRKNAX",
+    "description": "Kirknax se narodil s mikrofonem v ruce a statistikou připravenou k použití. Je schopen diskutovat o ekonomice, morálce, historii i ceně rohlíků, aniž by opustil jednu větu. Jeho přirozeným prostředím je univerzitní kampus, kde loví nic netušící studentky otázkou: „Můžeme si o tom promluvit?“",
+    "rarity": "rare",
+    "active": 1,
+    "image": "images/onax-9.jpg"
+  },
+  {
+    "id": 10,
+    "name": "HRADNÍ ONAX",
+    "description": "Hradní Onax začínal jako obyčejný občan, ale jednoho dne se rozhodl, že republika potřebuje silnější vedení. Vyhrál volby se 104 % hlasů, protože hlasovaly i jeho alternativní verze. Na Pražském hradě zřídil Ministerstvo Onaxe, Úřad pro ochranu Onaxe a Národní radu pro posuzování velikosti Onaxova ega.",
+    "rarity": "mythic",
+    "active": 1,
+    "image": "images/onax-10.jpg"
+  },
+  {
+    "id": 11,
+    "name": "ONAX WHITE",
+    "description": "Onax Sins byl kdysi nenápadným učitelem chemie. Všechno se změnilo, když zjistil, že jeho talent na výrobu krystalů může financovat mnohem ambicióznější plány. Jeho laboratoř je čistší než operační sál, jeho účetnictví horší než státní rozpočet a jeho největší nepřítel je člověk, který mu řekne, že něco neumí.",
+    "rarity": "epic",
+    "active": 1,
+    "image": "images/onax-11.jpg"
+  },
+  {
+    "id": 12,
+    "name": "STATE PROPERTY ONAX",
+    "description": "State Property Onax není občan. Je strategická státní rezerva. Jeho obličej se nachází na oficiálních dokumentech, jeho existence je financována z veřejných prostředků a každý pokus o jeho odstranění musí projít třemi ministerstvy. Stát ho vlastní, ale nikdo netuší, kdo ho vlastně řídí.",
+    "rarity": "common",
+    "active": 1,
+    "image": "images/onax-12.jpg"
+  },
+  {
+    "id": 13,
+    "name": "TRUMPONAX",
+    "description": "Trumponax je miliardář, vizionář a podle vlastních slov nejúspěšnější člověk v historii lidstva. Jeho účes vzdoruje gravitaci, jeho proslovy časovým limitům a jeho sebevědomí všem ekonomickým ukazatelům. Slíbil postavit zeď kolem multivesmíru a přinutit ostatní Onaxy, aby ji zaplatili.",
+    "rarity": "common",
+    "active": 1,
+    "image": "images/onax-13.jpg"
+  },
+  {
+    "id": 14,
+    "name": "ROBLOXNAX",
+    "description": "Robloxnax vznikl, když se Onax pokusil přenést své vědomí do digitálního světa. Experiment uspěl, ale jeho tělo se změnilo v šest hranatých dílů. Nyní vládne vlastnímu serveru, kde jsou všechny herní průkazy povinné a každý hráč musí při připojení složit přísahu věrnosti. Legenda praví, že vlastní tolik Robuxů, že by mohl koupit samotný Roblox. Zatím ale čeká na kapesné.",
+    "rarity": "mythic",
+    "active": 1,
+    "image": "images/onax-14.jpg"
+  },
+  {
+    "id": 15,
+    "name": "ONANAX",
+    "description": "Muž více povolaní jehož se ženy nebojí a skoučou mu na dih",
+    "rarity": "legendary",
+    "active": 1,
+    "image": "images/onax-15.jpg"
+  }
+]

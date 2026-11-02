@@ -1,289 +1,269 @@
-import { createReel } from "../src/reel.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   LocalGame,
   SAVE_KEY,
-  dayKey,
-  validateSave,
+  RULES,
+  PACKS,
   freshSave,
   defaultCards,
-  RULES,
+  validateSave,
+  dayKey,
+  drawRarity,
+  type Card,
+  type PackId,
 } from "../src/local-game.ts";
-function fixture() {
+import { createReel } from "../src/reel.ts";
+const placeholder = "placeholder";
+const seeds: Card[] = Object.entries(RULES).map(([rarity, rule], i) => ({
+  id: i + 1,
+  name: `Onax ${rarity}`,
+  description: "Dlouhý popis.\nDruhý odstavec.",
+  rarity: rarity as Card["rarity"],
+  price: rule.price,
+  image: placeholder,
+  active: 1,
+}));
+function fixture(catalog = seeds) {
   const data = new Map<string, string>();
   const storage = {
-    getItem: (key: string) => data.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      data.set(key, value);
+    getItem: (k: string) => data.get(k) ?? null,
+    setItem: (k: string, v: string) => {
+      data.set(k, v);
     },
   };
-  const names = [
-    "Onax Original",
-    "Onax Neko",
-    "Onax Supreme",
-    "Onax Samurai",
-    "První Onax",
-  ];
-  const seeds = Object.keys(RULES).map((rarity, i) => ({
-    id: i + 1,
-    name: names[i],
-    description: "Testovací karta",
-    rarity: rarity as keyof typeof RULES,
-    image: "placeholder",
-    price: Object.values(RULES)[i].price,
-    active: 1,
-  }));
-  return {
-    game: new LocalGame(storage, "placeholder", seeds),
-    data,
-    storage,
-    seeds,
-  };
+  return { game: new LocalGame(storage, placeholder, catalog), storage, data };
 }
-test("nová hra má 100 mincí a pět aktivních rarit, obnova zachová postup", () => {
-  const { game, storage, seeds } = fixture();
-  assert.equal(game.load().coins, 100);
-  assert.equal(game.load().catalog.length, 5);
-  game.buy(() => 0);
-  const restored = new LocalGame(storage, "placeholder", seeds);
-  assert.equal(restored.load().coins, 90);
-  assert.equal(restored.load().inventory.length, 1);
+const buyCommon = (g: LocalGame, n: 1 | 2 | 4 = 1) =>
+  g.buy("origins", n, () => 0);
+test("nová hra má 100 OC, prázdnou sbírku, žádné objevy a deset oficiálních karet", () => {
+  const s = freshSave(placeholder);
+  assert.equal(s.coins, 100);
+  assert.equal(s.catalog.length, 10);
+  assert.equal(s.discovered.length, 0);
+  assert.equal(s.inventory.length, 0);
+  assert.ok(
+    s.catalog.every((c) => c.image.startsWith("data:image/jpeg;base64,")),
+  );
+  validateSave(s, placeholder);
 });
-test("balíček stojí 10 mincí, uloží jednoho Onaxe a prodej nelze opakovat", () => {
-  const { game } = fixture();
-  const cards = game.buy(() => 0);
-  assert.equal(cards.length, 1);
-  assert.equal(new Set(cards.map((c) => c.id)).size, 1);
-  assert.equal(new Set(cards.map((c) => c.inventory_id)).size, 1);
-  game.sell(cards[0].inventory_id!);
-  assert.equal(game.load().coins, 91);
-  assert.equal(game.load().inventory.length, 0);
-  assert.throws(() => game.sell(cards[0].inventory_id!), /není ve sbírce/);
-  assert.equal(game.load().coins, 91);
+test("domluvené ceny balíčků, prodejní ceny a přesné šance všech čtyř typů", () => {
+  assert.deepEqual(
+    Object.values(PACKS).map((p) => p.cost),
+    [25, 40, 67, 85],
+  );
+  assert.deepEqual(
+    Object.values(RULES).map((r) => r.price),
+    [10, 15, 20, 100, 150],
+  );
+  for (const pack of Object.values(PACKS)) {
+    const counts: Record<string, number> = {
+      common: 0,
+      rare: 0,
+      epic: 0,
+      legendary: 0,
+      mythic: 0,
+    };
+    for (let i = 0; i < 100; i++)
+      counts[drawRarity(pack.chances, (i + 0.5) / 100)]++;
+    assert.deepEqual(counts, pack.chances);
+    const expected = Object.entries(pack.chances).reduce(
+      (n, [r, chance]) => n + (chance * RULES[r as Card["rarity"]].price) / 100,
+      0,
+    );
+    assert.ok(expected < pack.cost);
+  }
 });
-test("bez mincí se nezmění zůstatek ani inventář", () => {
+test("každý balíček skutečně losuje podle vlastních šancí", () => {
+  for (const id of Object.keys(PACKS) as PackId[]) {
+    const { game } = fixture();
+    const rich = game.load();
+    rich.coins = 10000;
+    game.import(JSON.stringify(rich));
+    const counts: Record<string, number> = {
+      common: 0,
+      rare: 0,
+      epic: 0,
+      legendary: 0,
+      mythic: 0,
+    };
+    for (let i = 0; i < 100; i++) {
+      let call = 0;
+      const c = game.buy(id, 1, () =>
+        call++ % 2 === 0 ? (i + 0.5) / 100 : 0,
+      )[0];
+      counts[c.rarity]++;
+    }
+    assert.deepEqual(counts, PACKS[id].chances);
+  }
+});
+test("čtyři balíčky jsou jeden atomický nákup, duplicity mají různá inventory ID", () => {
   const { game } = fixture();
-  for (let i = 0; i < 10; i++) game.buy(() => 0);
+  const result = buyCommon(game, 4);
+  assert.equal(result.length, 4);
+  assert.equal(game.load().coins, 0);
+  assert.equal(new Set(result.map((c) => c.inventory_id)).size, 4);
+  assert.equal(new Set(result.map((c) => c.id)).size, 1);
+  assert.deepEqual(game.load().discovered, [1]);
+  assert.equal(game.load().inventory.length, 4);
   const before = game.export();
-  assert.throws(() => game.buy(), /dost mincí/);
+  assert.throws(() => buyCommon(game), /Potřebuješ/);
   assert.equal(game.export(), before);
 });
-test("všech sto hodnot losu odpovídá poměru 60/25/10/4/1", () => {
+test("neplatný nebo příliš drahý hromadný nákup nic nestrhne", () => {
   const { game } = fixture();
-  let backup = JSON.parse(game.export());
-  backup.coins = 10000;
-  game.import(JSON.stringify(backup));
-  const counts: Record<string, number> = {};
-  for (let i = 0; i < 100; i++) {
-    let call = 0;
-    const cards = game.buy(() => (call++ % 2 === 0 ? (i + 0.5) / 100 : 0));
-    for (const c of cards) counts[c.rarity] = (counts[c.rarity] ?? 0) + 1;
-  }
-  assert.deepEqual(counts, {
-    common: 60,
-    rare: 25,
-    epic: 10,
-    legendary: 4,
-    mythic: 1,
-  });
+  const before = game.export();
+  assert.throws(() => game.buy("apex", 2));
+  assert.throws(() => game.buy("bad" as PackId, 1));
+  assert.throws(() => game.buy("origins", 3 as 1));
+  assert.throws(() => game.buy("origins", 1, () => 1));
+  assert.equal(game.export(), before);
 });
-test("denní odměna jednou za pražský den včetně změny data a návratu hodin", () => {
+test("objevení zůstává po prodeji, reloadu a exportu/importu", () => {
+  const { game, storage } = fixture();
+  const result = buyCommon(game, 2);
+  game.sellMany(result.map((c) => c.inventory_id!));
+  assert.equal(game.load().coins, 70);
+  assert.equal(game.load().inventory.length, 0);
+  assert.deepEqual(game.load().discovered, [1]);
+  const other = new LocalGame(storage, placeholder, seeds);
+  assert.deepEqual(other.load().discovered, [1]);
+  const fresh = fixture().game;
+  fresh.import(game.export());
+  assert.deepEqual(fresh.load().discovered, [1]);
+});
+test("opakovaný prodej a smíšený neplatný hromadný prodej jsou odmítnuty celé", () => {
   const { game } = fixture();
-  const now = new Date("2026-10-27T22:59:00Z");
+  const [a, b] = buyCommon(game, 2);
+  const before = game.export();
+  assert.throws(() => game.sellMany([a.inventory_id!, 999]));
+  assert.throws(() => game.sellMany([a.inventory_id!, a.inventory_id!]));
+  assert.equal(game.export(), before);
+  game.sell(a.inventory_id!);
+  const sold = game.export();
+  assert.throws(() => game.sell(a.inventory_id!));
+  assert.equal(game.export(), sold);
+  assert.equal(game.load().inventory[0].inventory_id, b.inventory_id);
+});
+test("denní odměna je 50 OC, jednou za pražský den", () => {
+  const { game } = fixture();
+  const now = new Date("2026-11-02T22:59:00Z");
   game.daily(now);
-  assert.equal(game.load().coins, 120);
-  assert.throws(() => game.daily(now), /už máš/);
-  game.daily(new Date("2026-10-27T23:01:00Z"));
-  assert.equal(game.load().coins, 140);
-  assert.throws(() => game.daily(now), /už máš/);
+  assert.equal(game.load().coins, 150);
+  assert.throws(() => game.daily(now));
+  game.daily(new Date("2026-11-02T23:01:00Z"));
+  assert.equal(game.load().coins, 200);
+  assert.throws(() => game.daily(now));
   assert.equal(dayKey(new Date("2026-07-01T22:01:00Z")), "2026-07-02");
 });
-test("záloha přenese mince, sbírku i vlastní obrázky a přepočítá prodejní cenu", () => {
+test("import nemůže změnit oficiální katalog, ceny, aktivaci ani fotky", () => {
   const { game } = fixture();
-  game.addCard({
-    name: "Vlastní Onax",
-    description: "Ahoj",
-    rarity: "mythic",
+  const backup = game.load();
+  backup.catalog[0] = {
+    ...backup.catalog[0],
+    name: "Podvržená karta",
+    price: 99999,
+    active: 0,
     image: "data:image/png;base64,YWJj",
-  });
-  game.buy(() => 0);
-  const saved = game.export();
-  const other = fixture().game;
-  other.import(saved);
-  assert.deepEqual(other.load(), game.load());
-  const modified = JSON.parse(saved);
-  modified.inventory[0].price = 9999;
-  other.import(JSON.stringify(modified));
-  assert.equal(other.load().inventory[0].price, 1);
+  };
+  game.import(JSON.stringify(backup));
+  assert.deepEqual(game.load().catalog, seeds);
+  assert.equal(buyCommon(game)[0].name, seeds[0].name);
 });
-test("neplatný import ani vyčerpání úložiště nezničí starý postup", () => {
+test("migrace původní zálohy zachová mince, denní odměnu a získané karty", () => {
+  const { game } = fixture();
+  const old: any = freshSave(placeholder, seeds);
+  old.version = 1;
+  delete old.discovered;
+  old.coins = 73;
+  old.lastDaily = "2026-11-01";
+  old.inventory = [
+    { ...seeds[0], id: 18, inventory_id: 1, price: 1 },
+    { ...seeds[1], id: 19, inventory_id: 2, price: 2 },
+  ];
+  old.nextCardId = 20;
+  old.nextInventoryId = 3;
+  game.import(JSON.stringify(old));
+  const s = game.load();
+  assert.equal(s.coins, 73);
+  assert.equal(s.lastDaily, "2026-11-01");
+  assert.equal(s.inventory.length, 2);
+  assert.deepEqual(
+    s.inventory.map((c) => c.id),
+    [1, 2],
+  );
+  assert.deepEqual(
+    s.inventory.map((c) => c.price),
+    [10, 15],
+  );
+  assert.deepEqual(s.discovered, [1, 2]);
+});
+test("nová vydaná karta se objeví automaticky a zůstane zamčená, metadata se aktualizují", () => {
+  const { game, storage } = fixture();
+  buyCommon(game);
+  const updated = seeds.map((c) => ({ ...c }));
+  updated[0].description = "Nový dlouhý popis.";
+  updated.push({ ...seeds[4], id: 6, name: "Nová legenda" });
+  const next = new LocalGame(storage, placeholder, updated);
+  const s = next.load();
+  assert.equal(s.catalog.length, 6);
+  assert.deepEqual(s.discovered, [1]);
+  assert.equal(s.inventory[0].description, "Nový dlouhý popis.");
+  assert.equal(s.coins, 75);
+});
+test("dříve vlastní neoficiální karta zůstane archivním úlovkem, ne v losování", () => {
+  const { game } = fixture();
+  const old: any = freshSave(placeholder, seeds);
+  old.version = 1;
+  delete old.discovered;
+  old.catalog.push({ ...seeds[0], id: 6, name: "Osobní karta" });
+  old.inventory = [{ ...old.catalog[5], inventory_id: 1 }];
+  old.nextCardId = 7;
+  old.nextInventoryId = 2;
+  game.import(JSON.stringify(old));
+  assert.equal(game.load().catalog.length, 5);
+  assert.equal(game.load().inventory[0].name, "Osobní karta");
+  assert.ok(game.load().inventory[0].id >= 1000000000);
+  game.sell(1);
+  assert.equal(game.load().coins, 110);
+});
+test("neplatný import, poškozená data a chyba kvóty nezničí postup ani neodečtou mince", () => {
   const { game, data, storage } = fixture();
-  game.load();
-  const before = data.get(SAVE_KEY);
+  const before = game.export();
   assert.throws(() => game.import("{bad"));
-  const bad = JSON.parse(game.export());
+  const bad = JSON.parse(before);
   bad.catalog[0].image = "javascript:alert(1)";
   assert.throws(() => game.import(JSON.stringify(bad)));
-  bad.catalog[0].image = "placeholder";
-  bad.inventory = [
-    { ...bad.catalog[0], inventory_id: 1 },
-    { ...bad.catalog[0], inventory_id: 1 },
-  ];
-  assert.throws(() => validateSave(bad, "placeholder"));
-  assert.equal(data.get(SAVE_KEY), before);
+  assert.equal(game.export(), before);
   storage.setItem = () => {
-    throw Error("Quota exceeded");
+    throw Error("Quota");
   };
-  assert.throws(() => game.buy(() => 0), /nepodařilo uložit/);
+  assert.throws(() => buyCommon(game, 4), /nepodařilo uložit/);
   assert.equal(data.get(SAVE_KEY), before);
-});
-test("poškozená uložená hra se automaticky nepřepíše", () => {
-  const { game, data } = fixture();
   data.set(SAVE_KEY, "broken");
   assert.throws(() => game.load(), /Nic jsme nepřepsali/);
   assert.equal(data.get(SAVE_KEY), "broken");
-  game.reset();
-  assert.equal(game.load().coins, 100);
 });
-test("poslední kartu rarity nelze vyřadit; starý úlovek zůstává ve sbírce", () => {
-  const { game } = fixture();
-  game.buy(() => 0);
-  assert.throws(() => game.toggle(1), /Poslední aktivní/);
-  game.addCard({
-    name: "Nová common",
-    description: "",
-    rarity: "common",
-    image: "placeholder",
-  });
-  game.toggle(1);
-  assert.equal(game.load().inventory.length, 1);
-  assert.ok(game.buy(() => 0).every((c) => c.id === 6));
-});
-
-test("fotka se neukládá znovu pro každý získaný duplikát", () => {
-  const { game, data } = fixture();
-  game.addCard({
-    name: "Fotka",
-    description: "",
-    rarity: "common",
-    image: "data:image/jpeg;base64," + "A".repeat(100000),
-  });
-  game.toggle(1);
-  for (let i = 0; i < 5; i++) game.buy(() => 0);
-  assert.equal(game.load().inventory.length, 5);
-  assert.ok(data.get(SAVE_KEY)!.length < 150000);
-  assert.equal(
-    game.load().inventory[0].image,
-    game.load().catalog.at(-1)!.image,
-  );
-  const other = fixture().game;
-  other.import(game.export());
-  assert.deepEqual(other.load(), game.load());
-});
-
-test("starší záloha se čtyřmi kartami i nová mince zůstávají kompatibilní", () => {
-  const { game } = fixture();
-  const old = JSON.parse(game.export());
-  old.inventory = Array.from({ length: 4 }, (_, i) => ({
-    ...old.catalog[0],
-    inventory_id: i + 1,
-  }));
-  old.nextInventoryId = 5;
-  game.import(JSON.stringify(old));
-  assert.equal(game.load().inventory.length, 4);
-  game.setCoinImage("data:image/jpeg;base64,YWJj");
-  const other = fixture().game;
-  other.import(game.export());
-  assert.equal(other.load().coinImage, "data:image/jpeg;base64,YWJj");
-  assert.equal(other.load().inventory.length, 4);
-  assert.equal(other.buy(() => 0).length, 1);
-});
-
-test("reel skrývá obě nejvyšší rarity za totožný symbol a drží uloženého vítěze", () => {
-  const { game } = fixture();
-  const c = game.load().catalog;
-  const legendary = createReel(c, c[3], () => 0.99),
-    mythic = createReel(c, c[4], () => 0.99);
-  assert.deepEqual(legendary.items[legendary.winningIndex], {
-    kind: "special",
-  });
-  assert.deepEqual(legendary.items, mythic.items);
-  assert.ok(!JSON.stringify(legendary.items).includes("legendary"));
-  assert.ok(!JSON.stringify(legendary.items).includes("mythic"));
-  const normal = createReel(c, c[1], () => 0.99);
+test("oba tajné výsledky zůstávají na pásu anonymní a podíly odpovídají balíčku", () => {
+  const a = createReel(seeds, seeds[3], () => 0.99, "apex"),
+    b = createReel(seeds, seeds[4], () => 0.99, "apex");
+  assert.deepEqual(a.items, b.items);
+  assert.deepEqual(a.items[a.winningIndex], { kind: "special" });
+  const normal = createReel(seeds, seeds[0], () => 0, "apex");
   assert.deepEqual(normal.items[normal.winningIndex], {
     kind: "card",
-    card: c[1],
+    card: seeds[0],
   });
-});
-
-test("import pouze katalogu zachová peníze a staré úlovky bez kolize ID", () => {
-  const { game } = fixture();
-  game.buy(() => 0);
-  const before = game.load();
-  const custom = fixture().game;
-  custom.addCard({
-    name: "Nová karta ze zálohy",
-    description: "",
-    rarity: "mythic",
-    image: "data:image/png;base64,YWJj",
-  });
-  custom.setCoinImage("data:image/png;base64,YWJj");
-  game.importCatalog(custom.export());
-  const after = game.load();
-  assert.equal(after.coins, before.coins);
-  assert.deepEqual(after.inventory, before.inventory);
-  assert.ok(after.catalog.every((c) => c.id >= before.nextCardId));
-  assert.ok(after.catalog.some((c) => c.name === "Nová karta ze zálohy"));
-  assert.equal(after.coinImage, "data:image/png;base64,YWJj");
-  const restored = fixture().game;
-  restored.import(game.export());
-  assert.deepEqual(restored.load(), after);
-});
-
-test("výchozí hra obsahuje všech deset vlastních karet s fotkami, bez cizího postupu", () => {
-  const save = freshSave("placeholder");
-  assert.equal(save.catalog.length, 10);
-  assert.equal(save.coins, 100);
-  assert.deepEqual(save.inventory, []);
-  assert.equal(save.lastDaily, null);
-  assert.equal(save.nextCardId, 16);
   assert.ok(
-    save.catalog.every(
-      (c) => c.active === 1 && c.image.startsWith("data:image/jpeg;base64,"),
-    ),
+    normal.items
+      .filter((_, i) => i !== normal.winningIndex)
+      .every((item) => item.kind === "card" && item.card.rarity === "rare"),
   );
-  assert.equal(new Set(save.catalog.map((c) => c.rarity)).size, 5);
-  validateSave(save, "placeholder");
-  const second = freshSave("placeholder");
-  save.catalog[0].name = "Změna";
-  assert.notEqual(second.catalog[0].name, "Změna");
 });
-
-test("automatický přechod ze starých náhledů zachová mince a sbírku", () => {
-  const { game, storage } = fixture();
-  game.buy(() => 0);
-  const before = game.load();
-  const updated = new LocalGame(storage, "placeholder");
-  const after = updated.load();
-  assert.equal(after.catalog.length, 10);
-  assert.equal(after.coins, before.coins);
-  assert.deepEqual(after.inventory, before.inventory);
-  assert.ok(after.nextCardId >= 16);
-  assert.equal(updated.buy(() => 0).length, 1);
-  assert.equal(updated.load().coins, 80);
-});
-
-test("aktualizace nepřepíše vlastní katalog ani stav vyřazení", () => {
-  const { game, storage } = fixture();
-  game.addCard({
-    name: "Moje vlastní",
-    description: "",
-    rarity: "common",
-    image: "placeholder",
-  });
-  game.toggle(1);
-  const before = game.load();
-  assert.deepEqual(new LocalGame(storage, "placeholder").load(), before);
+test("záloha obrázku mince zůstává kompatibilní", () => {
+  const { game } = fixture();
+  game.setCoinImage("data:image/png;base64,YWJj");
+  const other = fixture().game;
+  other.import(game.export());
+  assert.equal(other.load().coinImage, "data:image/png;base64,YWJj");
 });

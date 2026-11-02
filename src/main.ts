@@ -12,6 +12,9 @@ import { createReel, isSpecial, type ReelItem } from "./reel";
 import {
   LocalGame,
   RULES,
+  PACKS,
+  type PackId,
+  type PackCount,
   dayKey,
   freshSave,
   imageData,
@@ -40,12 +43,16 @@ let state = {
   daily_available: true,
   catalog: demoCards,
   coinImage: "",
+  inventory: [] as Card[],
+  discovered: [] as number[],
 };
 let page = "home";
 let filter = "all";
-let currentResult: Card | null = null;
+let currentResults: Card[] = [];
+let selectedPack: PackId = "origins";
+let selectedCount: PackCount = 1;
 let rollToken = 0;
-let activeTween: gsap.core.Tween | null = null;
+const activeTweens = new Set<gsap.core.Tween>();
 
 let busy = false;
 const app = document.querySelector<HTMLDivElement>("#app")!;
@@ -66,24 +73,24 @@ function toast(message: string) {
   setTimeout(() => t.classList.remove("show"), 4500);
 }
 function card(c: Card, extras = "", preview = false) {
-  return `<article class="onax-card ${c.rarity}" data-tilt><div class="card-inner"><header><span class="card-series">ONAX / 001</span><span class="rarity-symbol">${c.rarity === "mythic" ? "✦" : c.rarity === "legendary" ? "✧" : "◆"}</span></header><div class="card-art"><img src="${esc(c.image)}" alt="${esc(c.name)}" loading="lazy" onerror="this.onerror=null;this.src='${placeholder}'"><div class="art-shine"></div>${preview ? '<span class="preview-tag">UKÁZKA VZHLEDU</span>' : ""}</div><div class="card-copy"><div class="card-rarity">${rarityNames[c.rarity]} <span>✦</span></div><h3>${esc(c.name)}</h3><p>${esc(c.description)}</p><div class="card-bottom"><span>ROLL AN ONAX</span><span>${c.rarity === "mythic" ? "★★★★★" : c.rarity === "legendary" ? "★★★★" : c.rarity === "epic" ? "★★★" : c.rarity === "rare" ? "★★" : "★"}</span></div></div></div><div class="holo"></div>${extras}</article>`;
+  return `<article class="onax-card ${c.rarity}" data-tilt><div class="card-inner"><header><span class="card-series">ONAX / ${String(c.id).padStart(3, "0")}</span><span class="rarity-symbol">${c.rarity === "mythic" ? "✦" : c.rarity === "legendary" ? "✧" : "◆"}</span></header><div class="card-art"><img src="${esc(c.image)}" alt="${esc(c.name)}" loading="lazy" onerror="this.onerror=null;this.src='${placeholder}'"><div class="art-shine"></div>${preview ? '<span class="preview-tag">UKÁZKA VZHLEDU</span>' : ""}</div><div class="card-copy"><div class="card-rarity">${rarityNames[c.rarity]} <span>✦</span></div><h3>${esc(c.name)}</h3><p>${esc(c.description)}</p><div class="card-bottom"><span>ROLL AN ONAX</span><span>${c.rarity === "mythic" ? "★★★★★" : c.rarity === "legendary" ? "★★★★" : c.rarity === "epic" ? "★★★" : c.rarity === "rare" ? "★★" : "★"}</span></div></div></div><div class="holo"></div>${extras}</article>`;
 }
 function header() {
-  return `<header class="site-header"><a class="brand" href="#home"><span class="brand-mark">O<span>✦</span></span>ROLL AN <b>ONAX</b></a><nav aria-label="Hlavní navigace"><a href="#home" class="${page === "home" ? "active" : ""}">Balíčky</a><a href="#collection" class="${page === "collection" ? "active" : ""}">Moje sbírka</a><a href="#admin">Karty</a></nav><div class="header-account"><span class="balance">${coin(state.coins)}</span><button class="avatar" data-action="backup" aria-label="Záloha a nastavení" title="Záloha a nastavení">⚙</button></div></header>`;
+  return `<header class="site-header"><a class="brand" href="#home"><span class="brand-mark">O<span>✦</span></span>ROLL AN <b>ONAX</b></a><nav aria-label="Hlavní navigace"><a href="#home" class="${page === "home" ? "active" : ""}">Balíčky</a><a href="#collection" class="${page === "collection" ? "active" : ""}">Moje sbírka</a><a href="#cards" class="${page === "cards" ? "active" : ""}">Karty</a></nav><div class="header-account"><span class="balance">${coin(state.coins)}</span><button class="avatar" data-action="backup" aria-label="Záloha a nastavení" title="Záloha a nastavení">⚙</button></div></header>`;
 }
 function home() {
   const featured = state.catalog.length ? state.catalog : demoCards;
   const hero = featured.find((c) => c.rarity === "legendary") || featured[0];
-  return `<main><section class="hero"><div class="hero-grain"></div><div class="hero-content"><div class="eyebrow"><span class="live-dot"></span> PRVNÍ EDICE · ONAX ORIGINS</div><h1>ROZBAL TO.<br>NAJDI SVOU<br><span>LEGENDU.</span></h1><p>Jeden balíček. Jeden Onax. A ten pocit,<br>když padne něco výjimečného.</p><div class="hero-actions"><button class="btn" data-action="buy">Otevřít balíček <span><span class="arrow" aria-hidden="true"></span></span></button><div class="pack-price">${coin(10)} <span>/ balíček</span></div></div><div class="hero-proof"><span class="mini-stars">✦ ✦ ✦</span> Žádné skutečné peníze. Jen pořádný štěstí.</div></div><div class="hero-visual"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="floating-label"><span class="live-dot"></span> TVŮJ DALŠÍ ÚLOVEK?</div><div class="ghost-card ghost-left"></div><div class="ghost-card ghost-right"></div><div class="hero-card">${card(hero, "", !state.catalog.length)}</div><div class="visual-caption"><span>01 / 05</span><span>VÍC NEŽ JEN KARTA.</span></div><span class="spark spark-one">✦</span><span class="spark spark-two">✧</span></div><div class="hero-bottom"><span>SBÍREJ. OBJEVUJ. OPAKUJ.</span><a href="#rarities">PROZKOUMAT EDICI ↓</a></div></section><div class="ticker" aria-hidden="true"><span>1 ONAX V BALÍČKU</span>✦<span>5 ÚROVNÍ RARITY</span>✦<span>100 MINCÍ DO ZAČÁTKU</span>✦<span>KAŽDÝ DEN NOVÁ ŠANCE</span>✦</div><section class="section" id="rarities"><div class="section-heading"><div><div class="eyebrow">MALÁ ŠANCE. VELKÝ MOMENT.</div><h2>NE KAŽDÝ ONAX<br>JE <span>OBYČEJNÝ.</span></h2></div><p>Od první karty po nejvzácnější úlovek.<br>Každá rarita má svůj vlastní charakter.</p></div><div class="rarity-grid">${Object.entries(
+  return `<main><section class="hero"><div class="hero-grain"></div><div class="hero-content"><div class="eyebrow"><span class="live-dot"></span> PRVNÍ EDICE · ONAX ORIGINS</div><h1>ROZBAL TO.<br>NAJDI SVOU<br><span>LEGENDU.</span></h1><p>Jeden balíček. Jeden Onax. A ten pocit,<br>když padne něco výjimečného.</p><div class="hero-actions"><button class="btn" data-action="buy">Otevřít balíček <span><span class="arrow" aria-hidden="true"></span></span></button><div class="pack-price">${coin(25)} <span>/ balíček</span></div></div><div class="hero-proof"><span class="mini-stars">✦ ✦ ✦</span> Žádné skutečné peníze. Jen pořádný štěstí.</div></div><div class="hero-visual"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="floating-label"><span class="live-dot"></span> TVŮJ DALŠÍ ÚLOVEK?</div><div class="ghost-card ghost-left"></div><div class="ghost-card ghost-right"></div><div class="hero-card">${card(hero, "", !state.catalog.length)}</div><div class="visual-caption"><span>EDICE / ${String(state.catalog.length).padStart(2, "0")}</span><span>VÍC NEŽ JEN KARTA.</span></div><span class="spark spark-one">✦</span><span class="spark spark-two">✧</span></div><div class="hero-bottom"><span>SBÍREJ. OBJEVUJ. OPAKUJ.</span><a href="#rarities">PROZKOUMAT EDICI ↓</a></div></section><div class="ticker" aria-hidden="true"><span>1 ONAX V BALÍČKU</span>✦<span>5 ÚROVNÍ RARITY</span>✦<span>100 MINCÍ DO ZAČÁTKU</span>✦<span>KAŽDÝ DEN NOVÁ ŠANCE</span>✦</div>${packLobby()}<section class="section" id="rarities"><div class="section-heading"><div><div class="eyebrow">MALÁ ŠANCE. VELKÝ MOMENT.</div><h2>NE KAŽDÝ ONAX<br>JE <span>OBYČEJNÝ.</span></h2></div><p>Od první karty po nejvzácnější úlovek.<br>Každá rarita má svůj vlastní charakter.</p></div><div class="rarity-grid">${Object.entries(
     RULES,
   )
     .map(
       ([r, v], i) =>
-        `<div class="rarity-tile ${r}"><span class="tile-number">0${i + 1}</span><span class="tile-icon">${["◇", "◆", "✧", "✦", "✺"][i]}</span><h3>${rarityNames[r as Rarity]}</h3><div><span>Šance na kartu</span><b>${v.chance} %</b></div><div><span>Prodejní cena</span><b>${v.price} OC</b></div></div>`,
+        `<div class="rarity-tile ${r}"><span class="tile-number">0${i + 1}</span><span class="tile-icon">${["◇", "◆", "✧", "✦", "✺"][i]}</span><h3>${rarityNames[r as Rarity]}</h3><div><span>Rarita</span><b>${i + 1} / 5</b></div><div><span>Prodejní cena</span><b>${v.price} OC</b></div></div>`,
     )
     .join(
       "",
-    )}</div></section><section class="daily-section"><div class="daily-orb"><span class="coin large">${state.coinImage ? `<img src="${esc(state.coinImage)}" alt="">` : "O"}</span><span class="spark">✦</span></div><div><div class="eyebrow">MALÝ RITUÁL. VELKÁ ODMĚNA.</div><h2>ZÍTRA ZASE?<br><span>DNESKA TAKY.</span></h2><p>Vrať se každý den pro 20 Onaxcoinů.<br>Další legenda může být jen jeden balíček daleko.</p></div><button class="btn" data-action="daily" ${!state.daily_available ? "disabled" : ""}>${!state.daily_available ? "Dnes vyzvednuto ✓" : "Vyzvednout 20 mincí"} <span><span class="arrow" aria-hidden="true"></span></span></button></section><section class="section how"><div class="eyebrow">JEDNODUCHÝ PLÁN</div><h2>OD BALÍČKU KE <span>SBÍRCE.</span></h2><div class="steps"><div><span>01 /</span><h3>Vyber si štěstí.</h3><p>Začni se 100 mincemi. Jeden balíček stojí jen 10.</p></div><div><span>02 /</span><h3>Roztoč svůj příběh.</h3><p>Sleduj pás. Zlatý symbol skrývá Legendary nebo Mythic.</p></div><div><span>03 /</span><h3>Nech si legendy.</h3><p>Buduj sbírku. Přebytečné karty prodej a zkus další balíček.</p></div></div></section></main>`;
+    )}</div></section><section class="daily-section"><div class="daily-orb"><span class="coin large">${state.coinImage ? `<img src="${esc(state.coinImage)}" alt="">` : "O"}</span><span class="spark">✦</span></div><div><div class="eyebrow">MALÝ RITUÁL. VELKÁ ODMĚNA.</div><h2>ZÍTRA ZASE?<br><span>DNESKA TAKY.</span></h2><p>Vrať se každý den pro 50 Onaxcoinů.<br>Další legenda může být jen jeden balíček daleko.</p></div><button class="btn" data-action="daily" ${!state.daily_available ? "disabled" : ""}>${!state.daily_available ? "Dnes vyzvednuto ✓" : "Vyzvednout 50 mincí"} <span><span class="arrow" aria-hidden="true"></span></span></button></section><section class="section how"><div class="eyebrow">JEDNODUCHÝ PLÁN</div><h2>OD BALÍČKU KE <span>SBÍRCE.</span></h2><div class="steps"><div><span>01 /</span><h3>Vyber si štěstí.</h3><p>Začni se 100 mincemi. Origins stojí 25 mincí. Otevři až čtyři naráz.</p></div><div><span>02 /</span><h3>Roztoč svůj příběh.</h3><p>Sleduj pás. Zlatý symbol skrývá Legendary nebo Mythic.</p></div><div><span>03 /</span><h3>Nech si legendy.</h3><p>Buduj sbírku. Přebytečné karty prodej a zkus další balíček.</p></div></div></section></main>`;
 }
 function shell(content: string) {
   app.innerHTML = `${header()}${storageError ? `<div class="connection-banner" role="alert">${esc(storageError)} <button class="text-button" data-action="backup">Obnovit zálohu</button></div>` : ""}${content}<footer><a class="brand" href="#home">ROLL AN <b>ONAX</b><span>✦</span></a><p>Velké úlovky začínají malým kliknutím.</p><span>© ${new Date().getFullYear()} ONAX · VIRTUÁLNÍ SBĚRATELSKÁ HRA</span></footer><div id="toast" role="status" aria-live="polite"></div><dialog id="modal"></dialog>`;
@@ -107,12 +114,16 @@ function shell(content: string) {
 }
 async function render() {
   page = location.hash.slice(1) || "home";
-  if (page === "rarities") page = "home";
+  if (page === "admin") {
+    location.hash = "cards";
+    page = "cards";
+  }
+  if (page === "rarities" || page === "packs") page = "home";
   if (page === "home") {
     shell(home());
-    if (location.hash === "#rarities")
+    if (location.hash === "#rarities" || location.hash === "#packs")
       document
-        .getElementById("rarities")
+        .getElementById(location.hash.slice(1))
         ?.scrollIntoView({ behavior: "smooth" });
     return;
   }
@@ -138,57 +149,18 @@ async function render() {
     }
     return;
   }
-  if (page === "admin") {
+  if (page === "cards") {
+    const found = state.catalog.filter((c) =>
+      state.discovered.includes(c.id),
+    ).length;
     shell(
-      `<main class="section inner-page"><div class="eyebrow">ZÁKULISÍ EDICE</div><h1>SPRÁVA <span>KARET.</span></h1><p>Přidej vlastní fotky a karty. Změny se ukládají jen v tomto prohlížeči a zahrnou se do zálohy. Základní karty můžeš vyřadit po přidání vlastní karty stejné rarity.</p><div class="admin-layout"><form id="card-form" class="panel"><h2>NOVÝ ONAX</h2><label>Název<input name="name" maxlength="80" required placeholder="Onax Samurai"></label><label>Popis<textarea name="description" maxlength="500" rows="3" placeholder="Příběh téhle karty…"></textarea></label><label>Rarita<select name="rarity">${Object.entries(
-        rarityNames,
-      )
-        .map(([r, n]) => `<option value="${r}">${n}</option>`)
-        .join(
-          "",
-        )}</select></label><label>Obrázek (JPG, PNG, WebP · max. 5 MB)<input name="image" type="file" accept="image/jpeg,image/png,image/webp" required></label><div class="form-error" role="alert"></div><button class="btn">Přidat do edice <span class="arrow" aria-hidden="true"></span></button></form><div><div class="eyebrow">ŽIVÝ NÁHLED</div><div id="admin-preview">${card(demoCards[0], "", true)}</div></div></div><h2>KATALOG EDICE</h2><div id="admin-list" class="admin-list"></div></main>`,
+      `<main class="section inner-page"><div class="eyebrow">EDICE / ONAX UNIVERSE</div><div class="page-heading"><div><h1>ONAX <span>INDEX.</span></h1><p>Každý úlovek odhalí další příběh. Objevené karty nezmizí ani po prodeji.</p></div><div class="discovery-score"><strong>${found}<span> / ${state.catalog.length}</span></strong><small>OBJEVENÝCH ONAXŮ</small></div></div><progress class="discovery-progress" value="${found}" max="${state.catalog.length}" aria-label="Počet objevených karet"></progress><div class="collection-tools"><p>Nové edice se objeví tady. Dokážeš je objevit všechny?</p><button class="btn" data-action="buy">Objevit dalšího Onaxe <span class="arrow"></span></button>${filterSelect()}</div><div id="catalog" class="collection-grid"></div></main>`,
     );
-    let previewUrl = "";
-    const form = document.querySelector<HTMLFormElement>("#card-form")!;
-    form.addEventListener("input", () => {
-      const f = new FormData(form);
-      const img = f.get("image") as File;
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      previewUrl = img?.size ? URL.createObjectURL(img) : "";
-      document.querySelector("#admin-preview")!.innerHTML = card({
-        id: 0,
-        name: String(f.get("name") || "Nový Onax"),
-        description: String(f.get("description") || "Tvůj příběh začíná tady."),
-        rarity: f.get("rarity") as Rarity,
-        image: previewUrl || placeholder,
-        price: 0,
-      });
-      bindTilt();
+    drawCatalog();
+    document.querySelector("#filter")?.addEventListener("change", (e) => {
+      filter = (e.target as HTMLSelectElement).value;
+      drawCatalog();
     });
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const b = form.querySelector<HTMLButtonElement>("button")!;
-      b.disabled = true;
-      try {
-        const data = new FormData(form);
-        const file = data.get("image") as File;
-        const image = await imageData(file);
-        game.addCard({
-          name: String(data.get("name") || "").trim(),
-          description: String(data.get("description") || "").trim(),
-          rarity: data.get("rarity") as Rarity,
-          image,
-        });
-        if (previewUrl) URL.revokeObjectURL(previewUrl);
-        await refresh();
-        await render();
-        toast("Nová karta je v edici.");
-      } catch (e) {
-        form.querySelector(".form-error")!.textContent = (e as Error).message;
-        b.disabled = false;
-      }
-    });
-    await adminList();
     return;
   }
   location.hash = "home";
@@ -203,26 +175,53 @@ function drawInventory(cards: Card[]) {
     ? visible
         .map(
           (c) =>
-            `<div class="owned-card">${card(c)}<button class="btn btn-sell" data-sell="${c.inventory_id}" data-price="${c.price}">Prodat kartu <span>+ ${c.price} OC</span></button></div>`,
+            `<div class="owned-card"><button class="card-open" data-detail="${c.inventory_id}" aria-label="Detail karty ${esc(c.name)}">${card(c)}</button><button class="btn btn-sell" data-sell="${c.inventory_id}" data-price="${c.price}">Prodat kartu <span>+ ${c.price} OC</span></button></div>`,
         )
         .join("")
     : '<div class="empty"><span>◇</span><h2>ZATÍM ŽÁDNÝ ÚLOVEK.</h2><p>Otevři balíček nebo vyber jinou raritu.</p><button class="btn" data-action="buy">Otevřít balíček <span class="arrow" aria-hidden="true"></span></button></div>';
   bindTilt();
 }
-async function adminList() {
-  try {
-    const d = { cards: game.load().catalog.slice().reverse() };
-    document.querySelector("#admin-list")!.innerHTML = d.cards.length
-      ? d.cards
-          .map(
-            (c) =>
-              `<div class="admin-row"><img src="${esc(c.image)}" alt=""><div><strong>${esc(c.name)}</strong><span class="${c.rarity}">${rarityNames[c.rarity]}</span></div><span>${Number(c.active) ? "V losování" : "Vyřazeno"}</span><button class="text-button" data-toggle="${c.id}">${Number(c.active) ? "Vyřadit" : "Vrátit"}</button></div>`,
-          )
-          .join("")
-      : "<p>Katalog je zatím prázdný.</p>";
-  } catch (e) {
-    toast((e as Error).message);
-  }
+function filterSelect() {
+  return `<label>Rarita <select id="filter"><option value="all">Všechny rarity</option>${Object.entries(
+    rarityNames,
+  )
+    .map(
+      ([r, name]) =>
+        `<option value="${r}" ${filter === r ? "selected" : ""}>${name}</option>`,
+    )
+    .join("")}</select></label>`;
+}
+function lockedCard(c: Card) {
+  return `<article class="locked-card ${c.rarity}"><span class="locked-id">#${String(c.id).padStart(3, "0")}</span><div class="unknown-figure" aria-hidden="true"><span>?</span></div><span class="locked-rarity">${rarityNames[c.rarity]}</span><h3>NEOBJEVENÝ ONAX</h3><p>${c.active ? "Čeká na první úlovek" : "Archivní edice"}</p></article>`;
+}
+function drawCatalog() {
+  document.querySelector("#catalog")!.innerHTML =
+    state.catalog
+      .filter((c) => filter === "all" || c.rarity === filter)
+      .map((c) =>
+        state.discovered.includes(c.id)
+          ? `<div class="catalog-entry"><button class="card-open" data-catalog-detail="${c.id}" aria-label="Detail karty ${esc(c.name)}">${card(c)}</button><div class="catalog-caption"><span>✦ OBJEVENO</span><span>${state.inventory.filter((i) => i.id === c.id).length} ks</span></div></div>`
+          : `<div class="catalog-entry">${lockedCard(c)}</div>`,
+      )
+      .join("") || '<p class="empty">Tato rarita zatím nemá kartu.</p>';
+  bindTilt();
+}
+function detail(c: Card) {
+  const owned = state.inventory.filter((i) => i.id === c.id);
+  modal(
+    `<div class="card-detail ${c.rarity}"><div class="detail-art">${card(c)}</div><div class="detail-copy"><div class="eyebrow">#${String(c.id).padStart(3, "0")} / ${rarityNames[c.rarity]}</div><h2>${esc(c.name)}</h2><p class="full-description">${esc(c.description) || "Tenhle Onax ještě svůj příběh nenapsal."}</p><dl><div><dt>Prodejní cena</dt><dd>${coin(c.price)}</dd></div><div><dt>Ve tvé sbírce</dt><dd>${owned.length} ks</dd></div></dl>${owned.length ? `<button class="btn" data-detail-sell="${c.inventory_id ?? owned[0].inventory_id}">Prodat jeden kus · +${c.price} OC</button>` : '<p class="fine">Karta zůstává objevená i po prodeji.</p>'}<button class="text-button" data-action="close">Zavřít detail</button><div class="form-error" role="alert"></div></div></div>`,
+    true,
+  );
+}
+function packLobby() {
+  return `<section class="section pack-lobby" id="packs"><div class="section-heading"><div><div class="eyebrow">VYBER SI SVŮJ DALŠÍ LEVEL</div><h2>ČTYŘI CESTY.<br><span>JEDNA LEGENDA.</span></h2></div><p>Vyšší liga. Vyšší šance.<br>Každý balíček obsahuje jednoho Onaxe.</p></div><div class="pack-grid">${Object.entries(
+    PACKS,
+  )
+    .map(
+      ([id, p], i) =>
+        `<button class="pack-option pack-${id}" data-pick-pack="${id}"><span class="pack-level">LEVEL 0${i + 1}</span><span class="pack-gem">${["◇", "◈", "✦", "✺"][i]}</span><h3>${p.name}</h3><p>${p.tag}</p><span class="pack-special">${p.chances.legendary + p.chances.mythic}% Legendary / Mythic</span><span class="pack-buy">${coin(p.cost)} <span class="arrow"></span></span></button>`,
+    )
+    .join("")}</div></section>`;
 }
 let previousFocus: HTMLElement | null = null;
 function modal(html: string, wide = false) {
@@ -240,14 +239,13 @@ function modal(html: string, wide = false) {
 }
 function close() {
   rollToken++;
-  activeTween?.kill();
-  activeTween = null;
+  for (const tween of [...activeTweens]) tween.kill();
   document.querySelector<HTMLDialogElement>("#modal")?.close();
   void render();
 }
 function backup() {
   modal(
-    `<div class="eyebrow">ULOŽENO V TOMTO PROHLÍŽEČI</div><h2>TVŮJ POSTUP.</h2><p>Mince, sbírka i vlastní karty se ukládají automaticky. Smazání dat prohlížeče je odstraní. Pro přenos na jiné PC použij zálohu. V anonymním režimu se postup po zavření může ztratit.</p><button class="btn" data-action="export">Stáhnout zálohu</button><label>Soubor zálohy<input id="import-file" type="file" accept=".json,application/json"></label><button class="btn" data-action="import">Obnovit celý postup</button><button class="btn btn-secondary" data-action="import-catalog">Načíst jen karty</button><p class="fine">Jen karty: nahradí katalog, tvoje mince a sbírka zůstanou.</p><label>Vlastní obrázek Onaxcoinu<input id="coin-file" type="file" accept="image/jpeg,image/png,image/webp"></label><button class="btn btn-secondary" data-action="coin-image">Uložit obrázek mince</button><button class="text-button logout" data-action="reset">Začít znovu / vymazat postup</button><div class="form-error" role="alert"></div>`,
+    `<div class="eyebrow">ULOŽENO V TOMTO PROHLÍŽEČI</div><h2>TVŮJ POSTUP.</h2><p>Mince, sbírka i objevení Onaxové se ukládají automaticky. Smazání dat prohlížeče je odstraní. Pro přenos na jiné PC použij zálohu. V anonymním režimu se postup po zavření může ztratit.</p><button class="btn" data-action="export">Stáhnout zálohu</button><label>Soubor zálohy<input id="import-file" type="file" accept=".json,application/json"></label><button class="btn" data-action="import">Obnovit celý postup</button><p class="fine">Obnova přenese mince, sbírku a objevy. Katalog vždy určuje aktuální edice hry.</p><label>Vlastní obrázek Onaxcoinu<input id="coin-file" type="file" accept="image/jpeg,image/png,image/webp"></label><button class="btn btn-secondary" data-action="coin-image">Uložit obrázek mince</button><button class="text-button logout" data-action="reset">Začít znovu / vymazat postup</button><div class="form-error" role="alert"></div>`,
   );
 }
 async function refresh() {
@@ -256,6 +254,8 @@ async function refresh() {
     coins: save.coins,
     daily_available: !save.lastDaily || save.lastDaily < dayKey(),
     catalog: save.catalog,
+    inventory: save.inventory,
+    discovered: save.discovered,
     coinImage: save.coinImage || "",
   };
   storageError = "";
@@ -263,8 +263,29 @@ async function refresh() {
   if (balance) balance.innerHTML = coin(state.coins);
 }
 async function buy() {
+  const pack = PACKS[selectedPack];
+  const total = pack.cost * selectedCount;
   modal(
-    `<div class="pack-confirm"><div class="eyebrow">ONAX ORIGINS / EDICE 01</div><div class="booster"><div>ROLL AN<br><strong>ONAX</strong></div><span class="booster-emblem">✦</span><span>ORIGINS<br><small>1 NÁHODNÝ ONAX</small></span></div><h2>CO SE SKRÝVÁ UVNITŘ?</h2><p>Jeden Onax. Pět rarit. Roztoč svůj další úlovek.</p><button class="btn" data-action="confirm-buy">Rozbalit za ${coin(10)} <span class="arrow" aria-hidden="true"></span></button><p class="fine">Onax se uloží hned při nákupu. Zavřením animace o něj nepřijdeš.</p><div class="form-error" role="alert"></div></div>`,
+    `<div class="pack-picker"><div class="eyebrow">VYBER SI ŠTĚSTÍ</div><h2>DALŠÍ <span>ÚLOVEK.</span></h2><div class="pack-tabs" role="group" aria-label="Typ balíčku">${Object.entries(
+      PACKS,
+    )
+      .map(
+        ([id, p]) =>
+          `<button class="pack-tab ${id === selectedPack ? "selected" : ""}" data-select-pack="${id}" aria-pressed="${id === selectedPack}">${p.name}<small>${p.cost} OC</small></button>`,
+      )
+      .join(
+        "",
+      )}</div><div class="picker-preview pack-${selectedPack}"><div class="booster"><div>ROLL AN<br><strong>ONAX</strong></div><span class="booster-emblem">${{ origins: "◇", boost: "◈", elite: "✦", apex: "✺" }[selectedPack]}</span><span>${pack.name.toUpperCase()}<br><small>1 NÁHODNÝ ONAX</small></span></div><div><h3>${pack.name}</h3><p>${pack.tag}</p><div class="pack-odds">${Object.entries(
+      pack.chances,
+    )
+      .map(
+        ([r, chance]) =>
+          `<span class="${r}">${rarityNames[r as Rarity]}<b>${chance} %</b></span>`,
+      )
+      .join(
+        "",
+      )}</div></div></div><div class="quantity-row"><span>Kolik otevřít současně?</span><div role="group" aria-label="Počet balíčků">${[1, 2, 4].map((n) => `<button data-select-count="${n}" class="quantity ${selectedCount === n ? "selected" : ""}" aria-pressed="${selectedCount === n}">${n}×</button>`).join("")}</div></div><button class="btn" data-action="confirm-buy" ${state.coins < total ? "disabled" : ""}>Otevřít ${selectedCount}× ${pack.name} · ${coin(total)}</button><p class="fine">${state.coins < total ? `Chybí ${total - state.coins} OC. Zkus odměnu nebo prodej karty.` : "Celý nákup se uloží před animací. Karty neztratíš ani zavřením."}</p><div class="form-error" role="alert"></div></div>`,
+    true,
   );
 }
 function reelTile(item: ReelItem) {
@@ -278,22 +299,40 @@ function animate(
   vars: gsap.TweenVars,
 ): Promise<void> {
   return new Promise((resolve) => {
-    activeTween = gsap.to(target, {
+    const tween = gsap.to(target, {
       ...vars,
       onComplete: () => {
-        activeTween = null;
+        activeTweens.delete(tween);
         resolve();
       },
-      onInterrupt: resolve,
+      onInterrupt: () => {
+        activeTweens.delete(tween);
+        resolve();
+      },
     });
+    activeTweens.add(tween);
   });
 }
-function showResult(sold = false) {
-  const c = currentResult;
-  if (!c) return;
-  const special = isSpecial(c);
+function remainingResults() {
+  return currentResults.filter((c) =>
+    state.inventory.some((i) => i.inventory_id === c.inventory_id),
+  );
+}
+function showResult() {
+  const remaining = remainingResults();
+  const total = remaining.reduce((n, c) => n + c.price, 0);
+  const pack = PACKS[selectedPack];
+  const price = pack.cost * selectedCount;
+  const best = [...currentResults].sort((a, b) => b.price - a.price)[0];
   modal(
-    `<div class="result-view ${c.rarity} ${special ? "rare-result" : ""}"><div class="result-rays" aria-hidden="true"></div><div class="eyebrow">${sold ? "ONAX PRODANÝ" : special ? "TOHLE SE NEVIDÍ KAŽDÝ DEN" : "TVŮJ NOVÝ ÚLOVEK"}</div><h2>${sold ? "MINCE JSOU TVOJE." : rarityNames[c.rarity] + " ONAX!"}</h2><div class="result-card">${card(c)}</div><p>${sold ? "Tato karta už není ve sbírce." : "Uloženo ve sbírce. Můžeš ho nechat, nebo rovnou prodat."}</p><div class="result-actions"><button class="btn" data-action="again" ${state.coins < 10 ? "disabled" : ""}>${sold ? "Točit znovu" : "Nechat a točit"} · ${coin(10)}</button>${!sold ? `<button class="btn btn-secondary" data-action="sell-again" ${state.coins + c.price < 10 ? "disabled" : ""}>Prodat za ${c.price} a točit</button><button class="text-button" data-action="sell-result">Jen prodat · +${c.price} OC</button>` : ""}</div>${state.coins < 10 ? '<p class="fine">Na další balíček potřebuješ 10 OC. Pomůže denní odměna nebo prodej karet.</p>' : ""}<button class="text-button" data-action="to-collection">Zpátky do sbírky</button><div class="form-error" role="alert"></div></div>`,
+    `<div class="result-view batch-result ${best.rarity} ${isSpecial(best) ? "rare-result" : ""}"><div class="result-rays" aria-hidden="true"></div><div class="eyebrow">${selectedCount}× ${pack.name.toUpperCase()} / VÝSLEDKY</div><h2>${currentResults.some(isSpecial) ? "LEGENDÁRNÍ MOMENT." : "TOHLE JE TVŮJ ÚLOVEK."}</h2><div class="batch-results count-${currentResults.length}">${currentResults
+      .map((c) => {
+        const sold = !remaining.some((i) => i.inventory_id === c.inventory_id);
+        return `<div class="batch-item ${sold ? "is-sold" : ""}"><div class="result-card">${card(c)}</div><p class="result-name">${esc(c.name)}</p><span class="result-price">${sold ? "PRODÁNO" : `${rarityNames[c.rarity]} · ${c.price} OC`}</span><button class="btn btn-secondary" data-result-sell="${c.inventory_id}" ${sold ? "disabled" : ""}>${sold ? "Prodáno" : `Prodat · +${c.price} OC`}</button></div>`;
+      })
+      .join(
+        "",
+      )}</div><div class="result-actions"><button class="btn" data-action="again" ${state.coins < price ? "disabled" : ""}>${remaining.length ? "Nechat a točit" : "Točit znovu"} ${selectedCount}× · ${coin(price)}</button><button class="btn btn-secondary" data-action="sell-again" ${!remaining.length || state.coins + total < price ? "disabled" : ""}>Prodat zbývající a točit · +${total} OC</button><button class="text-button" data-action="sell-result" ${!remaining.length ? "disabled" : ""}>Prodat všechny zbývající · +${total} OC</button></div><p class="fine">Neprodané karty jsou ve sbírce. Stejný Onax může padnout vícekrát.</p><button class="text-button" data-action="to-collection">Zpátky do sbírky</button><div class="form-error" role="alert"></div></div>`,
     true,
   );
 }
@@ -303,11 +342,8 @@ async function runSpin() {
   const token = ++rollToken;
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   try {
-    const winner = game.buy()[0];
-    currentResult = winner;
+    currentResults = game.buy(selectedPack, selectedCount);
     await refresh();
-    const balance = document.querySelector(".balance");
-    if (balance) balance.innerHTML = coin(state.coins);
     const booster = document.querySelector(".booster");
     if (booster && !reduced) {
       booster.classList.add("tearing");
@@ -320,25 +356,37 @@ async function runSpin() {
       });
       if (token !== rollToken) return;
     }
-    const { items, winningIndex } = createReel(state.catalog, winner);
+    const reels = currentResults.map((c) =>
+      createReel(state.catalog, c, Math.random, selectedPack),
+    );
     modal(
-      `<div class="roll-view"><div class="eyebrow">ONAX ORIGINS / 1 ONAX</div><h2>TAK SE <span>UKAŽ.</span></h2><p class="roll-status" role="status">Losování běží…</p><div class="reel-window"><div class="reel-marker" aria-hidden="true"></div><div class="reel-track">${items.map(reelTile).join("")}</div></div><p class="fine">Zlatý symbol skrývá Legendary nebo Mythic. Výsledek už je bezpečně uložený.</p><button class="text-button" data-action="skip-roll">Přeskočit animaci</button></div>`,
+      `<div class="roll-view ${selectedCount > 1 ? "multi-roll" : ""}"><div class="eyebrow">${PACKS[selectedPack].name.toUpperCase()} / ${selectedCount}× SOUČASNĚ</div><h2>TAK SE <span>UKAŽ.</span></h2><p class="roll-status" role="status">${selectedCount === 1 ? "Losování běží…" : "Všechny pásy se točí současně…"}</p><div class="reels-stack">${reels.map((r, i) => `<div class="reel-lane"><span class="lane-label">BALÍČEK 0${i + 1}</span><div class="reel-window" data-lane="${i}"><div class="reel-marker" aria-hidden="true"></div><div class="reel-track">${r.items.map(reelTile).join("")}</div></div></div>`).join("")}</div><p class="fine">Zlatý symbol skrývá Legendary nebo Mythic. Všechny výsledky už jsou uložené.</p><button class="text-button" data-action="skip-roll">Přeskočit animace</button></div>`,
       true,
     );
-    const frame = document.querySelector<HTMLElement>(".reel-window")!;
-    const tile = document.querySelector<HTMLElement>(".reel-tile")!;
-    const step = tile.getBoundingClientRect().width + 12;
-    const center = frame.clientWidth / 2;
-    gsap.set(".reel-track", { x: center - step * 2.5 });
-    await animate(".reel-track", {
-      x: center - step * (winningIndex + 0.5) + 6,
-      duration: reduced ? 0.12 : 4.8,
-      ease: "power4.out",
-    });
+    await Promise.all(
+      reels.map((r, i) => {
+        const frame = document.querySelector<HTMLElement>(
+          `[data-lane="${i}"]`,
+        )!;
+        const tile = frame.querySelector<HTMLElement>(".reel-tile")!;
+        const track = frame.querySelector<HTMLElement>(".reel-track")!;
+        const step = tile.getBoundingClientRect().width + 12;
+        gsap.set(track, { x: frame.clientWidth / 2 - step * 2.5 });
+        return animate(track, {
+          x: () =>
+            frame.clientWidth / 2 -
+            (tile.getBoundingClientRect().width + 12) * (r.winningIndex + 0.5) +
+            6,
+          duration: reduced ? 0.12 : 4.8,
+          ease: "power4.out",
+        });
+      }),
+    );
     if (token !== rollToken) return;
-    if (isSpecial(winner)) {
+    const specials = currentResults.filter(isSpecial);
+    if (specials.length) {
       modal(
-        `<div class="rare-cinematic"><div class="cinematic-ring ring-a"></div><div class="cinematic-ring ring-b"></div><div class="rare-particles" aria-hidden="true">${Array.from({ length: 24 }, (_, i) => `<i style="--i:${i}"></i>`).join("")}</div><div class="cinematic-icon">✦</div><div class="eyebrow">NĚCO SE PROBOUZÍ…</div><h2>TOHLE NENÍ<br>OBYČEJNÝ ONAX.</h2></div>`,
+        `<div class="rare-cinematic"><div class="cinematic-ring ring-a"></div><div class="cinematic-ring ring-b"></div><div class="rare-particles" aria-hidden="true">${Array.from({ length: 24 }, (_, i) => `<i style="--i:${i}"></i>`).join("")}</div><div class="cinematic-icon">✦</div><div class="eyebrow">${specials.length > 1 ? `${specials.length} VZÁCNÉ ÚLOVKY V JEDNOM OTEVŘENÍ` : "NĚCO SE PROBOUZÍ…"}</div><h2>TOHLE NENÍ<br>OBYČEJNÝ ONAX.</h2></div>`,
         true,
       );
       await animate(".cinematic-icon", {
@@ -409,22 +457,19 @@ app.addEventListener("click", async (e) => {
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast("Záloha byla připravena ke stažení.");
     }
-    if (action === "import" || action === "import-catalog") {
+    if (action === "import") {
       const file =
         document.querySelector<HTMLInputElement>("#import-file")?.files?.[0];
       if (!file) throw Error("Nejdřív vyber JSON zálohu.");
       if (file.size > 5000000) throw Error("Záloha může mít nejvýše 5 MB.");
       if (
         !confirm(
-          action === "import-catalog"
-            ? "Nahradit katalog kartami ze zálohy? Mince a sbírka zůstanou."
-            : "Obnovit zálohu a nahradit současný postup i katalog?",
+          "Obnovit zálohu a nahradit současný postup? Katalog zůstane podle aktuální edice.",
         )
       )
         return;
       const raw = await file.text();
-      if (action === "import-catalog") game.importCatalog(raw);
-      else game.import(raw);
+      game.import(raw);
       await refresh();
       close();
       await render();
@@ -433,7 +478,7 @@ app.addEventListener("click", async (e) => {
     if (action === "reset") {
       if (
         !confirm(
-          "Opravdu smazat celý postup i vlastní karty? Bez zálohy je nelze obnovit.",
+          "Opravdu smazat celý postup a objevy? Bez zálohy je nelze obnovit.",
         )
       )
         return;
@@ -449,7 +494,7 @@ app.addEventListener("click", async (e) => {
       await refresh();
       close();
       await render();
-      toast("+20 Onaxcoinů. Štěstí přeje pravidelným!");
+      toast("+50 Onaxcoinů. Štěstí přeje pravidelným!");
     }
     if (action === "confirm-buy" || action === "again") {
       target.setAttribute("disabled", "");
@@ -457,15 +502,52 @@ app.addEventListener("click", async (e) => {
       target.removeAttribute("disabled");
     }
     if (action === "skip-roll") {
-      activeTween?.progress(1);
+      for (const tween of [...activeTweens]) tween.progress(1);
     }
     if (action === "sell-again" || action === "sell-result") {
-      if (busy || !currentResult) return;
-      target.setAttribute("disabled", "");
-      game.sell(currentResult.inventory_id!);
+      if (busy) return;
+      const ids = remainingResults().map((c) => c.inventory_id!);
+      if (!ids.length) return;
+      game.sellMany(ids);
       await refresh();
-      showResult(true);
+      showResult();
       if (action === "sell-again") await runSpin();
+    }
+    if (target.dataset.resultSell) {
+      if (busy) return;
+      game.sell(Number(target.dataset.resultSell));
+      await refresh();
+      showResult();
+    }
+    if (target.dataset.selectPack) {
+      selectedPack = target.dataset.selectPack as PackId;
+      await buy();
+    }
+    if (target.dataset.selectCount) {
+      selectedCount = Number(target.dataset.selectCount) as PackCount;
+      await buy();
+    }
+    if (target.dataset.pickPack) {
+      selectedPack = target.dataset.pickPack as PackId;
+      await buy();
+    }
+    if (target.dataset.detail) {
+      const c = state.inventory.find(
+        (c) => c.inventory_id === Number(target.dataset.detail),
+      );
+      if (c) detail(c);
+    }
+    if (target.dataset.catalogDetail) {
+      const c = state.catalog.find(
+        (c) => c.id === Number(target.dataset.catalogDetail),
+      );
+      if (c && state.discovered.includes(c.id)) detail(c);
+    }
+    if (target.dataset.detailSell) {
+      game.sell(Number(target.dataset.detailSell));
+      await refresh();
+      close();
+      toast("Karta prodaná. Objev v indexu zůstává.");
     }
     if (action === "to-collection") {
       close();
@@ -485,12 +567,6 @@ app.addEventListener("click", async (e) => {
       close();
       await render();
       toast("Karta prodaná. Mince máš zpátky.");
-    }
-    if (target.dataset.toggle) {
-      target.setAttribute("disabled", "");
-      game.toggle(Number(target.dataset.toggle));
-      await refresh();
-      await adminList();
     }
   } catch (e) {
     const error = document.querySelector("#modal[open] .form-error");

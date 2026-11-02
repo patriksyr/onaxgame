@@ -11,23 +11,68 @@ export type Card = {
   active?: number;
 };
 export const RULES = {
-  common: { chance: 60, price: 1 },
-  rare: { chance: 25, price: 2 },
-  epic: { chance: 10, price: 4 },
-  legendary: { chance: 4, price: 8 },
-  mythic: { chance: 1, price: 20 },
+  common: { chance: 60, price: 10 },
+  rare: { chance: 25, price: 15 },
+  epic: { chance: 10, price: 20 },
+  legendary: { chance: 4, price: 100 },
+  mythic: { chance: 1, price: 150 },
+};
+export type PackId = "origins" | "boost" | "elite" | "apex";
+export type PackCount = 1 | 2 | 4;
+export const PACKS: Record<
+  PackId,
+  { name: string; cost: number; tag: string; chances: Record<Rarity, number> }
+> = {
+  origins: {
+    name: "Origins",
+    cost: 25,
+    tag: "Tady začíná příběh",
+    chances: { common: 60, rare: 25, epic: 10, legendary: 4, mythic: 1 },
+  },
+  boost: {
+    name: "Boost",
+    cost: 40,
+    tag: "Štěstí na vyšší obrátky",
+    chances: { common: 35, rare: 35, epic: 20, legendary: 8, mythic: 2 },
+  },
+  elite: {
+    name: "Elite",
+    cost: 67,
+    tag: "Pro lovce výjimečných",
+    chances: { common: 10, rare: 25, epic: 40, legendary: 20, mythic: 5 },
+  },
+  apex: {
+    name: "Apex",
+    cost: 85,
+    tag: "Žádný obyčejný úlovek",
+    chances: { common: 0, rare: 10, epic: 40, legendary: 35, mythic: 15 },
+  },
 };
 export const SAVE_KEY = "roll-an-onax-local-v1";
 export type Save = {
-  version: 1;
+  version: 1 | 2;
   coinImage?: string;
   coins: number;
   lastDaily: string | null;
   catalog: Card[];
   inventory: Card[];
+  discovered: number[];
   nextCardId: number;
   nextInventoryId: number;
 };
+export function drawRarity(
+  chances: Record<Rarity, number>,
+  random: number,
+): Rarity {
+  if (!Number.isFinite(random) || random < 0 || random >= 1)
+    throw Error("Neplatný náhodný los.");
+  let roll = random * 100;
+  for (const [rarity, chance] of Object.entries(chances)) {
+    roll -= chance;
+    if (roll < 0) return rarity as Rarity;
+  }
+  throw Error("Neplatné šance balíčku.");
+}
 export type StorageLike = Pick<Storage, "getItem" | "setItem">;
 export function dayKey(now = new Date()): string {
   return new Intl.DateTimeFormat("sv-SE", {
@@ -50,7 +95,8 @@ export function freshSave(
 ): Save {
   const cards = catalog.map((c) => ({ ...c }));
   return {
-    version: 1,
+    version: 2,
+    discovered: [],
     coins: 100,
     lastDaily: null,
     catalog: cards,
@@ -58,25 +104,6 @@ export function freshSave(
     nextCardId: Math.max(...cards.map((c) => c.id)) + 1,
     nextInventoryId: 1,
   };
-}
-const legacyNames = [
-  "Onax Original",
-  "Onax Neko",
-  "Onax Supreme",
-  "Onax Samurai",
-  "První Onax",
-];
-function isLegacyDefault(save: Save, placeholder: string): boolean {
-  return (
-    save.catalog.length === 5 &&
-    save.catalog.every(
-      (c) =>
-        c.id >= 1 &&
-        c.id <= 5 &&
-        c.name === legacyNames[c.id - 1] &&
-        c.image === placeholder,
-    )
-  );
 }
 const integer = (v: unknown) => Number.isSafeInteger(v) && Number(v) >= 0;
 export function validateSave(value: unknown, placeholder: string): Save {
@@ -86,7 +113,7 @@ export function validateSave(value: unknown, placeholder: string): Save {
   if (!value || typeof value !== "object") return bad();
   const s = value as Save;
   if (
-    s.version !== 1 ||
+    (s.version !== 1 && s.version !== 2) ||
     !integer(s.coins) ||
     !integer(s.nextCardId) ||
     !integer(s.nextInventoryId) ||
@@ -159,8 +186,16 @@ export function validateSave(value: unknown, placeholder: string): Save {
     s.nextInventoryId <= Math.max(0, ...inventory.map((c) => c.inventory_id!))
   )
     return bad();
+  const discovered = s.discovered ?? inventory.map((c) => c.id);
+  if (
+    !Array.isArray(discovered) ||
+    discovered.length > 10000 ||
+    discovered.some((id) => !integer(id) || id < 1)
+  )
+    return bad();
   return {
-    version: 1,
+    version: s.version,
+    discovered: [...new Set(discovered)],
     ...(s.coinImage ? { coinImage: s.coinImage } : {}),
     coins: s.coins,
     lastDaily: s.lastDaily,
@@ -208,19 +243,58 @@ export class LocalGame {
         "Uložený postup nelze načíst. Nic jsme nepřepsali. Obnov platnou zálohu nebo zvol výslovný reset.",
       );
     }
-    // Nahrazujeme jen známé původní náhledy; vlastní katalogy a sbírky se nemažou.
-    if (
-      isLegacyDefault(save, this.placeholder) &&
-      this.seeds.some((c) => c.image !== this.placeholder)
-    ) {
-      save.catalog = this.seeds.map((c) => ({ ...c }));
-      save.nextCardId = Math.max(
-        save.nextCardId,
-        ...save.catalog.map((c) => c.id + 1),
-      );
-      this.write(save);
-    }
+    save = this.normalize(save);
+    if (JSON.stringify(compact(save)) !== raw) this.write(save);
     return save;
+  }
+  private normalize(save: Save): Save {
+    const catalog = this.seeds.map((c) => ({
+      ...c,
+      price: RULES[c.rarity].price,
+    }));
+    const byId = new Map(catalog.map((c) => [c.id, c]));
+    const match = (c: Card) =>
+      save.version === 2 && byId.has(c.id)
+        ? byId.get(c.id)
+        : catalog.find(
+            (seed) => seed.name === c.name && seed.rarity === c.rarity,
+          );
+    const discovered = new Set<number>();
+    for (const id of save.discovered) {
+      const c = save.catalog.find((c) => c.id === id);
+      const found = save.version === 2 ? byId.get(id) : c && match(c);
+      if (found) discovered.add(found.id);
+    }
+    let next = Math.max(
+      save.nextCardId,
+      ...catalog.map((c) => c.id + 1),
+      ...save.inventory.map((c) => c.id + 1),
+    );
+    const archives = new Map<string, number>();
+    const inventory = save.inventory.map((c) => {
+      const found = match(c);
+      if (found) {
+        discovered.add(found.id);
+        return { ...found, inventory_id: c.inventory_id };
+      }
+      const key = JSON.stringify([c.id, c.name, c.rarity, c.image]);
+      if (!archives.has(key))
+        archives.set(
+          key,
+          c.id >= 1000000000
+            ? c.id
+            : ((next = Math.max(next, 1000000000)), next++),
+        );
+      return { ...c, id: archives.get(key)!, price: RULES[c.rarity].price };
+    });
+    return {
+      ...save,
+      version: 2,
+      catalog,
+      inventory,
+      discovered: [...discovered],
+      nextCardId: next,
+    };
   }
   private write(save: Save): void {
     validateSave(save, this.placeholder);
@@ -244,13 +318,18 @@ export class LocalGame {
     return result;
   }
   buy(
+    packId: PackId = "origins",
+    count: PackCount = 1,
     random: () => number = () =>
       crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296,
   ): Card[] {
+    if (!Object.hasOwn(PACKS, packId) || ![1, 2, 4].includes(count))
+      throw Error("Vyber platný balíček a počet 1, 2 nebo 4.");
+    const pack = PACKS[packId];
     return this.change((s) => {
-      if (s.coins < 10)
+      if (s.coins < pack.cost * count)
         throw Error(
-          "Nemáš dost mincí. Vyzvedni denní odměnu nebo prodej kartu.",
+          `Potřebuješ ${pack.cost * count} OC. Vyzvedni odměnu nebo prodej kartu.`,
         );
       const pool = Object.fromEntries(
         Object.keys(RULES).map((r) => [
@@ -258,28 +337,28 @@ export class LocalGame {
           s.catalog.filter((c) => c.rarity === r && c.active),
         ]),
       );
-      if (Object.values(pool).some((p) => !p.length))
-        throw Error("V losování musí zůstat alespoň jedna karta každé rarity.");
+      if (
+        Object.entries(pack.chances).some(
+          ([r, chance]) => chance > 0 && !pool[r].length,
+        )
+      )
+        throw Error("V edici chybí karta potřebné rarity.");
       const result: Card[] = [];
-      for (let i = 0; i < 1; i++) {
-        let roll = Math.floor(random() * 100) + 1;
-        let rarity: Rarity = "mythic";
-        for (const [r, rule] of Object.entries(RULES)) {
-          roll -= rule.chance;
-          if (roll <= 0) {
-            rarity = r as Rarity;
-            break;
-          }
-        }
+      for (let i = 0; i < count; i++) {
+        const rarity = drawRarity(pack.chances, random());
         const options = pool[rarity];
+        const pick = random();
+        if (!Number.isFinite(pick) || pick < 0 || pick >= 1)
+          throw Error("Neplatný náhodný los.");
         const c = {
-          ...options[Math.floor(random() * options.length)],
+          ...options[Math.floor(pick * options.length)],
           inventory_id: s.nextInventoryId++,
         };
-        s.inventory.push(c);
         result.push(c);
+        s.inventory.push(c);
+        if (!s.discovered.includes(c.id)) s.discovered.push(c.id);
       }
-      s.coins -= 10;
+      s.coins -= pack.cost * count;
       return result;
     });
   }
@@ -288,45 +367,24 @@ export class LocalGame {
       const today = dayKey(now);
       if (s.lastDaily && s.lastDaily >= today)
         throw Error("Dnešní odměnu už máš. Přijď zítra.");
-      s.coins += 20;
+      s.coins += 50;
       s.lastDaily = today;
     });
   }
   sell(id: number): void {
-    this.change((s) => {
-      const index = s.inventory.findIndex((c) => c.inventory_id === id);
-      if (index < 0) throw Error("Tato karta už není ve sbírce.");
-      s.coins += RULES[s.inventory[index].rarity].price;
-      s.inventory.splice(index, 1);
-    });
+    this.sellMany([id]);
   }
-  addCard(c: Pick<Card, "name" | "description" | "rarity" | "image">): void {
+  sellMany(ids: number[]): void {
+    if (!ids.length || new Set(ids).size !== ids.length)
+      throw Error("Vyber různé vlastněné karty.");
     this.change((s) => {
-      if (s.catalog.length >= 500)
-        throw Error("Katalog může obsahovat nejvýše 500 karet.");
-      const card = {
-        ...c,
-        id: s.nextCardId++,
-        price: RULES[c.rarity]?.price,
-        active: 1,
-      };
-      s.catalog.push(card);
-      validateSave(s, this.placeholder);
-    });
-  }
-  toggle(id: number): void {
-    this.change((s) => {
-      const card = s.catalog.find((c) => c.id === id);
-      if (!card) throw Error("Karta neexistuje.");
-      if (
-        card.active &&
-        s.catalog.filter((c) => c.rarity === card.rarity && c.active).length ===
-          1
-      )
-        throw Error(
-          "Poslední aktivní kartu této rarity nelze vyřadit. Nejdřív přidej jinou.",
-        );
-      card.active = card.active ? 0 : 1;
+      const cards = ids.map((id) =>
+        s.inventory.find((c) => c.inventory_id === id),
+      );
+      if (cards.some((c) => !c))
+        throw Error("Některá karta už není ve sbírce.");
+      s.coins += cards.reduce((total, c) => total + RULES[c!.rarity].price, 0);
+      s.inventory = s.inventory.filter((c) => !ids.includes(c.inventory_id!));
     });
   }
   setCoinImage(image: string): void {
@@ -346,27 +404,7 @@ export class LocalGame {
     } catch {
       throw Error("Soubor neobsahuje platnou JSON zálohu.");
     }
-    this.write(validateSave(parsed, this.placeholder));
-  }
-  importCatalog(raw: string): void {
-    if (raw.length > 5000000) throw Error("Záloha může mít nejvýše 5 MB.");
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      throw Error("Soubor neobsahuje platnou JSON zálohu.");
-    }
-    const imported = validateSave(parsed, this.placeholder);
-    if (
-      Object.keys(RULES).some(
-        (r) => !imported.catalog.some((c) => c.rarity === r && c.active),
-      )
-    )
-      throw Error("Katalog musí obsahovat aktivní kartu každé rarity.");
-    this.change((s) => {
-      s.catalog = imported.catalog.map((c) => ({ ...c, id: s.nextCardId++ }));
-      if (imported.coinImage) s.coinImage = imported.coinImage;
-    });
+    this.write(this.normalize(validateSave(parsed, this.placeholder)));
   }
   reset(): void {
     this.write(freshSave(this.placeholder, this.seeds));

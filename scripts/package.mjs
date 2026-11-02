@@ -4,6 +4,7 @@ await rm("release", { recursive: true, force: true });
 await mkdir("release/onax", { recursive: true });
 await cp("dist/index.html", "release/onax/index.html");
 await cp("README.md", "release/onax/README.md");
+await cp("KARTY.md", "release/onax/KARTY.md");
 await rm("onax-local.zip", { force: true });
 execFileSync("zip", ["-q", "-r", "../onax-local.zip", "onax"], {
   cwd: "release",
