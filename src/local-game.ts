@@ -11,9 +11,10 @@ export type Card = {
   active?: number;
 };
 export const RULES = {
-  common: { chance: 60, price: 10 },
-  rare: { chance: 25, price: 15 },
-  epic: { chance: 10, price: 20 },
+  // Common = cena Origins, aby hráč mohl vždy točit dál.
+  common: { chance: 60, price: 25 },
+  rare: { chance: 25, price: 30 },
+  epic: { chance: 10, price: 40 },
   legendary: { chance: 4, price: 100 },
   mythic: { chance: 1, price: 150 },
 };
@@ -48,6 +49,27 @@ export const PACKS: Record<
     chances: { common: 0, rare: 10, epic: 40, legendary: 35, mythic: 15 },
   },
 };
+// Vylepšení: obětuješ 3 stejné kusy, s malou šancí dostaneš náhodného Onaxe o raritu výš. Neúspěch = kusy jsou pryč.
+export const UPGRADE_COST = 3;
+export const UPGRADE: Partial<Record<Rarity, { to: Rarity; chance: number }>> =
+  {
+    common: { to: "rare", chance: 20 },
+    rare: { to: "epic", chance: 15 },
+    epic: { to: "legendary", chance: 10 },
+    legendary: { to: "mythic", chance: 5 },
+  };
+// Plinko: 8 řad kolíků, 9 přihrádek (binomicky 1/8/28/56/70/56/28/8/1 z 256). Očekávaná návratnost ~98,8 %.
+export const PLINKO_ROWS = 8;
+export const PLINKO_MULTIPLIERS = [10, 3, 1.4, 0.7, 0.4, 0.7, 1.4, 3, 10];
+export const PLINKO_BETS = [5, 10, 25, 50];
+const roll = (random: () => number) => {
+  const r = random();
+  if (!Number.isFinite(r) || r < 0 || r >= 1)
+    throw Error("Neplatný náhodný los.");
+  return r;
+};
+const secureRandom = () =>
+  crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
 export const SAVE_KEY = "roll-an-onax-local-v1";
 export type Save = {
   version: 1 | 2;
@@ -320,8 +342,7 @@ export class LocalGame {
   buy(
     packId: PackId = "origins",
     count: PackCount = 1,
-    random: () => number = () =>
-      crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296,
+    random: () => number = secureRandom,
   ): Card[] {
     if (!Object.hasOwn(PACKS, packId) || ![1, 2, 4].includes(count))
       throw Error("Vyber platný balíček a počet 1, 2 nebo 4.");
@@ -385,6 +406,50 @@ export class LocalGame {
         throw Error("Některá karta už není ve sbírce.");
       s.coins += cards.reduce((total, c) => total + RULES[c!.rarity].price, 0);
       s.inventory = s.inventory.filter((c) => !ids.includes(c.inventory_id!));
+    });
+  }
+  plinko(
+    bet: number,
+    random: () => number = secureRandom,
+  ): { path: number[]; slot: number; multiplier: number; win: number } {
+    if (!PLINKO_BETS.includes(bet)) throw Error("Vyber platnou sázku.");
+    return this.change((s) => {
+      if (s.coins < bet) throw Error(`Na sázku potřebuješ ${bet} OC.`);
+      const path = Array.from({ length: PLINKO_ROWS }, () =>
+        roll(random) < 0.5 ? 0 : 1,
+      );
+      const slot = path.reduce((a: number, b) => a + b, 0);
+      const multiplier = PLINKO_MULTIPLIERS[slot];
+      const win = Math.floor(bet * multiplier);
+      s.coins += win - bet;
+      return { path, slot, multiplier, win };
+    });
+  }
+  upgrade(
+    cardId: number,
+    random: () => number = secureRandom,
+  ): { success: boolean; card?: Card; chance: number } {
+    return this.change((s) => {
+      const copies = s.inventory.filter((c) => c.id === cardId);
+      const rule = copies[0] && UPGRADE[copies[0].rarity];
+      if (!rule) throw Error("Tuhle kartu nejde vylepšit.");
+      if (copies.length < UPGRADE_COST)
+        throw Error(`Na vylepšení potřebuješ ${UPGRADE_COST} stejné kusy.`);
+      const pool = s.catalog.filter((c) => c.rarity === rule.to && c.active);
+      if (!pool.length) throw Error("V edici chybí karta vyšší rarity.");
+      const used = new Set(
+        copies.slice(0, UPGRADE_COST).map((c) => c.inventory_id),
+      );
+      s.inventory = s.inventory.filter((c) => !used.has(c.inventory_id));
+      if (roll(random) * 100 >= rule.chance)
+        return { success: false, chance: rule.chance };
+      const card = {
+        ...pool[Math.floor(roll(random) * pool.length)],
+        inventory_id: s.nextInventoryId++,
+      };
+      s.inventory.push(card);
+      if (!s.discovered.includes(card.id)) s.discovered.push(card.id);
+      return { success: true, card, chance: rule.chance };
     });
   }
   setCoinImage(image: string): void {

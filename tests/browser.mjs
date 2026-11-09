@@ -58,12 +58,12 @@ async function result(p) {
 try {
   await mkdir(".test-data", { recursive: true });
   const p = await profile();
-  assert.equal((await save(p)).catalog.length, 10);
+  assert.equal((await save(p)).catalog.length, 24);
   assert.equal((await save(p)).coins, 100);
   await p.screenshot({ path: ".test-data/universe-home.png", fullPage: true });
   await p.getByRole("link", { name: "Karty", exact: true }).click();
   await p.locator("#catalog").waitFor();
-  assert.equal(await p.locator(".locked-card").count(), 10);
+  assert.equal(await p.locator(".locked-card").count(), 24);
   assert.equal(await p.locator("#catalog img").count(), 0);
   assert.equal(
     await p
@@ -89,18 +89,18 @@ try {
   await p.screenshot({ path: ".test-data/universe-results4.png" });
   await p.locator("[data-result-sell]").first().click();
   await p.locator(".batch-item.is-sold").waitFor();
-  assert.equal((await save(p)).coins, 10);
+  assert.equal((await save(p)).coins, 25);
   await p.locator("[data-action=sell-result]").click();
   await p.waitForFunction(
     () =>
       JSON.parse(localStorage.getItem("roll-an-onax-local-v1")).inventory
         .length === 0,
   );
-  assert.equal((await save(p)).coins, 40);
+  assert.equal((await save(p)).coins, 100);
   assert.ok(await p.locator("[data-action=sell-result]").isDisabled());
   await p.keyboard.press("Escape");
   await p.locator("#catalog").waitFor();
-  assert.equal(await p.locator(".locked-card").count(), 9);
+  assert.equal(await p.locator(".locked-card").count(), 23);
   assert.equal(await p.locator("[data-catalog-detail]").count(), 1);
   const snapshot = await save(p);
   const revealed = snapshot.catalog.find(
@@ -117,14 +117,14 @@ try {
   await p.keyboard.press("Escape");
   await p.reload();
   await p.locator("[data-catalog-detail]").waitFor();
-  assert.equal(await p.locator(".locked-card").count(), 9);
+  assert.equal(await p.locator(".locked-card").count(), 23);
   await p.getByRole("link", { name: "Balíčky", exact: true }).click();
   await p.getByRole("button", { name: /Vyzvednout 50 mincí/ }).click();
   await p.getByRole("button", { name: /Dnes vyzvednuto/ }).waitFor();
-  assert.equal((await save(p)).coins, 90);
+  assert.equal((await save(p)).coins, 150);
   await open(p, "boost", 2);
   await result(p);
-  assert.equal((await save(p)).coins, 10);
+  assert.equal((await save(p)).coins, 70);
   assert.equal((await save(p)).inventory.length, 2);
   await p.locator("[data-action=sell-result]").click();
   await p.waitForFunction(
@@ -132,12 +132,12 @@ try {
       JSON.parse(localStorage.getItem("roll-an-onax-local-v1")).inventory
         .length === 0,
   );
-  assert.equal((await save(p)).coins, 30);
+  assert.equal((await save(p)).coins, 120);
   await p.keyboard.press("Escape");
   await p.getByRole("link", { name: "Moje sbírka", exact: true }).click();
   await open(p, "origins", 1);
   await result(p);
-  assert.equal((await save(p)).coins, 5);
+  assert.equal((await save(p)).coins, 95);
   await p.locator("[data-action=to-collection]").click();
   await p.locator(".owned-card").waitFor();
   await p.locator("[data-detail]").click();
@@ -148,7 +148,7 @@ try {
   );
   await p.locator("[data-detail-sell]").click();
   await p.locator("#modal").waitFor({ state: "hidden" });
-  assert.equal((await save(p)).coins, 15);
+  assert.equal((await save(p)).coins, 120);
   assert.equal((await save(p)).inventory.length, 0);
   // Export a restore nesmí vrátit veřejnou správu či podvržený katalog.
   await p.getByRole("button", { name: "Záloha a nastavení" }).click();
@@ -160,19 +160,17 @@ try {
   modified.catalog[0].name = "PODVRŽENÝ KATALOG";
   modified.catalog[0].active = 0;
   modified.catalog[0].price = 99999;
-  await p
-    .locator("#import-file")
-    .setInputFiles({
-      name: "backup.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(JSON.stringify(modified)),
-    });
+  await p.locator("#import-file").setInputFiles({
+    name: "backup.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(modified)),
+  });
   await p.locator("[data-action=import]").click();
   await p.locator("#modal").waitFor({ state: "hidden" });
   assert.ok(
     !(await save(p)).catalog.some((c) => c.name === "PODVRŽENÝ KATALOG"),
   );
-  assert.equal((await save(p)).coins, 15);
+  assert.equal((await save(p)).coins, 120);
   assert.equal((await save(p)).discovered.length, 1);
   // Migrace reálného tvaru původní zálohy se čtyřmi kartami.
   const legacy = await profile();

@@ -3251,3 +3251,161 @@ dialog:has(.rare-cinematic) .ring-b {
     padding-top: 45px;
   }
 }
+/* Plinko */
+.plinko-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 32px;
+  margin-top: 32px;
+  align-items: center;
+}
+.plinko-board {
+  position: relative;
+  aspect-ratio: 1 / 0.9;
+  border: 1px solid #604174;
+  border-radius: 18px;
+  background: radial-gradient(circle at 50% 0%, #3a2152, #160d20 70%);
+  overflow: hidden;
+}
+.plinko-board .peg {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: #d1aff7;
+  box-shadow: 0 0 8px #a970e8;
+}
+.plinko-board .ball {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff6c9, #f2c94c 60%, #b8860b);
+  box-shadow: 0 0 14px #f2c94c;
+  opacity: 0;
+  z-index: 2;
+}
+.plinko-board .slots {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 3px;
+  padding: 0 3px 6px;
+}
+.plinko-board .slot {
+  text-align: center;
+  font:
+    800 13px "Barlow Condensed",
+    sans-serif;
+  padding: 6px 0;
+  border-radius: 6px;
+  background: #2a1838;
+  color: #bca1d2;
+  transition: transform 0.2s;
+}
+.plinko-board .slot.warm {
+  background: #57316f;
+  color: #f7edff;
+}
+.plinko-board .slot.hot {
+  background: #f2c94c;
+  color: #241532;
+}
+.plinko-board .slot.hit {
+  transform: translateY(4px) scale(1.12);
+  outline: 2px solid #fff;
+}
+.plinko-controls {
+  display: grid;
+  gap: 14px;
+  color: #c8b1db;
+}
+.plinko-controls > div {
+  display: flex;
+  gap: 8px;
+}
+.plinko-result {
+  font:
+    800 26px "Barlow Condensed",
+    sans-serif;
+  color: var(--lime);
+  min-height: 32px;
+}
+.btn-upgrade {
+  width: 100%;
+  margin-top: 8px;
+  font-size: 11px;
+  min-height: 42px;
+}
+@media (max-width: 800px) {
+  .plinko-wrap {
+    grid-template-columns: 1fr;
+  }
+}
+/* Kolo štěstí pro vylepšení */
+.upgrade-view {
+  text-align: center;
+}
+.wheel {
+  position: relative;
+  width: min(260px, 70vw);
+  margin: 18px auto;
+}
+.wheel svg {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+.wheel-track,
+.wheel-win {
+  fill: none;
+  stroke-width: 16;
+}
+.wheel-track {
+  stroke: #2a1838;
+}
+.wheel-pointer polygon {
+  fill: #fff;
+}
+.wheel-pointer line {
+  stroke: #fff;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.wheel-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  color: #f2c94c;
+}
+.wheel-center strong {
+  font:
+    800 34px "Barlow Condensed",
+    sans-serif;
+}
+.wheel-center small {
+  color: #bca1d2;
+}
+.wheel.won .wheel-win {
+  filter: drop-shadow(0 0 10px #f2c94c);
+}
+.wheel.lost .wheel-pointer polygon,
+.wheel.lost .wheel-pointer line {
+  fill: #93998d;
+  stroke: #93998d;
+}
+.btn-upgrade-go {
+  background: #f2c94c;
+  color: #241532;
+  width: 100%;
+}
+.upgrade-outcome .result-card {
+  max-width: 220px;
+  margin: 12px auto;
+}

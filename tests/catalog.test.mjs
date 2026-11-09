@@ -25,13 +25,13 @@ test("autorský pomocník přidá fotku a záznam; nové sestavení ho zahrne au
       "--image",
       resolve(temp, "content/images/onax-6.jpg"),
     ]);
-    assert.match(result.stdout, /Hotovo: #16/);
+    assert.match(result.stdout, /Hotovo: #30/);
     const cards = JSON.parse(
       await readFile(resolve(temp, "content/cards.json"), "utf8"),
     );
-    assert.equal(cards.length, 11);
-    assert.equal(cards.at(-1).id, 16);
-    assert.equal(cards.at(-1).image, "images/onax-16.jpg");
+    assert.equal(cards.length, 25);
+    assert.equal(cards.at(-1).id, 30);
+    assert.equal(cards.at(-1).image, "images/onax-30.jpg");
     const generated = await generateCatalog(temp);
     assert.equal(generated.at(-1).name, "Testovací Onax");
     assert.ok(generated.at(-1).image.startsWith("data:image/jpeg;base64,"));

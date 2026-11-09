@@ -23,11 +23,19 @@ Začínáš se **100 OC**, denní odměna je **50 OC**, jednou za kalendářní 
 | Elite   | 67 OC |   10 % | 25 % | 40 % |      20 % |    5 % |
 | Apex    | 85 OC |    0 % | 10 % | 40 % |      35 % |   15 % |
 
-Prodej: **Common 10 / Rare 15 / Epic 20 / Legendary 100 / Mythic 150 OC**. Průměrná prodejní hodnota úlovku je 17,25 / 26,75 / 40,25 / 67 OC podle typu balíčku, tedy méně než jeho cena.
+Prodej: **Common 25 / Rare 30 / Epic 40 / Legendary 100 / Mythic 150 OC**. Common se prodá přesně za cenu Origins, takže s ním můžeš vždy točit dál. Průměrná prodejní hodnota úlovku je 32 / 38,25 / 53,5 / 76,5 OC podle typu balíčku: Origins se neprodělá, dražší balíčky jsou sázka.
 
 Otevři **1, 2 nebo 4 stejné balíčky současně**. Každý obsahuje jednoho Onaxe, duplicity jsou možné a karty stejné rarity mají stejnou šanci. Nákup se uloží celý před animací; nedostatek peněz nebo chyba úložiště nestrhne část platby. Všechny pásy běží zároveň. Legendary a Mythic jsou skryté za stejnou zlatou ikonou a mají jedno společné slavnostní odhalení. Systémové nastavení omezeného pohybu zkrátí animace.
 
 Výsledky umožňují prodat jednotlivé kusy, všechny zbývající nebo prodat a točit znovu. Zavření křížkem, Escape či kliknutím mimo nechá neprodané karty ve sbírce.
+
+## Plinko
+
+Záložka **Plinko**: vsaď 5, 10, 25 nebo 50 OC a pusť 1, 5 nebo 10 kuliček najednou přes 8 řad kolíků (další můžeš pouštět, i když ostatní ještě padají). Přihrádky násobí sázku **10× / 3× / 1,4× / 0,7× / 0,4× / 0,7× / 1,4× / 3× / 10×** (výhra se zaokrouhluje dolů). Okraje jsou vzácné (1 : 256), průměrná návratnost je asi 98,8 %. Výsledek se uloží dřív, než kulička dopadne.
+
+## Vylepšení karet
+
+Máš-li **3 stejné kusy** Onaxe, můžeš je obětovat za šanci na náhodného Onaxe o raritu výš: Common → Rare **20 %**, Rare → Epic **15 %**, Epic → Legendary **10 %**, Legendary → Mythic **5 %**. Při neúspěchu jsou všechny 3 kusy pryč. Mythic vylepšit nejde. Tlačítko je u karty ve sbírce i v jejím detailu. Otevře kolo štěstí: barevná výseč odpovídá šanci, a když v ní ručička skončí, vylepšení vyšlo.
 
 ## Sbírka a index
 

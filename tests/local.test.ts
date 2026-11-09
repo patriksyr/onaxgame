@@ -5,6 +5,7 @@ import {
   SAVE_KEY,
   RULES,
   PACKS,
+  PLINKO_MULTIPLIERS,
   freshSave,
   defaultCards,
   validateSave,
@@ -36,10 +37,10 @@ function fixture(catalog = seeds) {
 }
 const buyCommon = (g: LocalGame, n: 1 | 2 | 4 = 1) =>
   g.buy("origins", n, () => 0);
-test("nová hra má 100 OC, prázdnou sbírku, žádné objevy a deset oficiálních karet", () => {
+test("nová hra má 100 OC, prázdnou sbírku, žádné objevy a 24 oficiálních karet", () => {
   const s = freshSave(placeholder);
   assert.equal(s.coins, 100);
-  assert.equal(s.catalog.length, 10);
+  assert.equal(s.catalog.length, 24);
   assert.equal(s.discovered.length, 0);
   assert.equal(s.inventory.length, 0);
   assert.ok(
@@ -54,7 +55,7 @@ test("domluvené ceny balíčků, prodejní ceny a přesné šance všech čtyř
   );
   assert.deepEqual(
     Object.values(RULES).map((r) => r.price),
-    [10, 15, 20, 100, 150],
+    [25, 30, 40, 100, 150],
   );
   for (const pack of Object.values(PACKS)) {
     const counts: Record<string, number> = {
@@ -71,7 +72,9 @@ test("domluvené ceny balíčků, prodejní ceny a přesné šance všech čtyř
       (n, [r, chance]) => n + (chance * RULES[r as Card["rarity"]].price) / 100,
       0,
     );
-    assert.ok(expected < pack.cost);
+    // Origins se záměrně neprodělá (common = cena balíčku), dražší balíčky jsou sázka.
+    if (pack === PACKS.origins) assert.equal(RULES.common.price, pack.cost);
+    else assert.ok(expected < pack.cost);
   }
 });
 test("každý balíček skutečně losuje podle vlastních šancí", () => {
@@ -123,7 +126,7 @@ test("objevení zůstává po prodeji, reloadu a exportu/importu", () => {
   const { game, storage } = fixture();
   const result = buyCommon(game, 2);
   game.sellMany(result.map((c) => c.inventory_id!));
-  assert.equal(game.load().coins, 70);
+  assert.equal(game.load().coins, 100);
   assert.equal(game.load().inventory.length, 0);
   assert.deepEqual(game.load().discovered, [1]);
   const other = new LocalGame(storage, placeholder, seeds);
@@ -194,7 +197,7 @@ test("migrace původní zálohy zachová mince, denní odměnu a získané karty
   );
   assert.deepEqual(
     s.inventory.map((c) => c.price),
-    [10, 15],
+    [25, 30],
   );
   assert.deepEqual(s.discovered, [1, 2]);
 });
@@ -225,7 +228,7 @@ test("dříve vlastní neoficiální karta zůstane archivním úlovkem, ne v lo
   assert.equal(game.load().inventory[0].name, "Osobní karta");
   assert.ok(game.load().inventory[0].id >= 1000000000);
   game.sell(1);
-  assert.equal(game.load().coins, 110);
+  assert.equal(game.load().coins, 125);
 });
 test("neplatný import, poškozená data a chyba kvóty nezničí postup ani neodečtou mince", () => {
   const { game, data, storage } = fixture();
@@ -266,4 +269,49 @@ test("záloha obrázku mince zůstává kompatibilní", () => {
   const other = fixture().game;
   other.import(game.export());
   assert.equal(other.load().coinImage, "data:image/png;base64,YWJj");
+});
+test("plinko: sázka se odečte, výhra připíše, binomická návratnost pod 100 %", () => {
+  const { game } = fixture();
+  const left = game.plinko(10, () => 0);
+  assert.equal(left.slot, 0);
+  assert.equal(left.win, 100);
+  assert.equal(game.load().coins, 190);
+  const mid = game.plinko(
+    10,
+    (() => {
+      let i = 0;
+      return () => (i++ % 2 ? 0.9 : 0);
+    })(),
+  );
+  assert.equal(mid.slot, 4);
+  assert.equal(game.load().coins, 184);
+  assert.throws(() => game.plinko(7));
+  const binom = [1, 8, 28, 56, 70, 56, 28, 8, 1];
+  const ev = binom.reduce((n, w, i) => n + w * PLINKO_MULTIPLIERS[i], 0) / 256;
+  assert.ok(ev < 1 && ev > 0.9);
+  const poor = fixture().game;
+  const s = poor.load();
+  s.coins = 4;
+  poor.import(JSON.stringify(s));
+  assert.throws(() => poor.plinko(5), /potřebuješ/);
+  assert.equal(poor.load().coins, 4);
+});
+test("vylepšení: 3 stejné kusy, neúspěch je spotřebuje, úspěch dá vyšší raritu", () => {
+  const { game } = fixture();
+  buyCommon(game, 4);
+  assert.throws(() => game.upgrade(5), /nejde/);
+  const fail = game.upgrade(1, () => 0.99);
+  assert.equal(fail.success, false);
+  assert.equal(game.load().inventory.length, 1);
+  assert.throws(() => game.upgrade(1), /3 stejné/);
+  game.daily();
+  buyCommon(game, 2);
+  const win = game.upgrade(1, () => 0);
+  assert.equal(win.success, true);
+  assert.equal(win.card!.rarity, "rare");
+  assert.deepEqual(
+    game.load().inventory.map((c) => c.rarity),
+    ["rare"],
+  );
+  assert.ok(game.load().discovered.includes(win.card!.id));
 });

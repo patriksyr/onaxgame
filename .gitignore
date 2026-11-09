@@ -11,3 +11,4 @@ test-results/
 
 src/data/default-cards.json
 src/data/default-cards.json.tmp
+.claude/

@@ -13,6 +13,11 @@ import {
   LocalGame,
   RULES,
   PACKS,
+  PLINKO_BETS,
+  PLINKO_MULTIPLIERS,
+  PLINKO_ROWS,
+  UPGRADE,
+  UPGRADE_COST,
   type PackId,
   type PackCount,
   dayKey,
@@ -51,6 +56,10 @@ let filter = "all";
 let currentResults: Card[] = [];
 let selectedPack: PackId = "origins";
 let selectedCount: PackCount = 1;
+let selectedBet = PLINKO_BETS[0];
+let selectedBalls = 1;
+let ballsInFlight = 0;
+let plinkoNet = 0;
 let rollToken = 0;
 const activeTweens = new Set<gsap.core.Tween>();
 
@@ -76,7 +85,7 @@ function card(c: Card, extras = "", preview = false) {
   return `<article class="onax-card ${c.rarity}" data-tilt><div class="card-inner"><header><span class="card-series">ONAX / ${String(c.id).padStart(3, "0")}</span><span class="rarity-symbol">${c.rarity === "mythic" ? "✦" : c.rarity === "legendary" ? "✧" : "◆"}</span></header><div class="card-art"><img src="${esc(c.image)}" alt="${esc(c.name)}" loading="lazy" onerror="this.onerror=null;this.src='${placeholder}'"><div class="art-shine"></div>${preview ? '<span class="preview-tag">UKÁZKA VZHLEDU</span>' : ""}</div><div class="card-copy"><div class="card-rarity">${rarityNames[c.rarity]} <span>✦</span></div><h3>${esc(c.name)}</h3><p>${esc(c.description)}</p><div class="card-bottom"><span>ROLL AN ONAX</span><span>${c.rarity === "mythic" ? "★★★★★" : c.rarity === "legendary" ? "★★★★" : c.rarity === "epic" ? "★★★" : c.rarity === "rare" ? "★★" : "★"}</span></div></div></div><div class="holo"></div>${extras}</article>`;
 }
 function header() {
-  return `<header class="site-header"><a class="brand" href="#home"><span class="brand-mark">O<span>✦</span></span>ROLL AN <b>ONAX</b></a><nav aria-label="Hlavní navigace"><a href="#home" class="${page === "home" ? "active" : ""}">Balíčky</a><a href="#collection" class="${page === "collection" ? "active" : ""}">Moje sbírka</a><a href="#cards" class="${page === "cards" ? "active" : ""}">Karty</a></nav><div class="header-account"><span class="balance">${coin(state.coins)}</span><button class="avatar" data-action="backup" aria-label="Záloha a nastavení" title="Záloha a nastavení">⚙</button></div></header>`;
+  return `<header class="site-header"><a class="brand" href="#home"><span class="brand-mark">O<span>✦</span></span>ROLL AN <b>ONAX</b></a><nav aria-label="Hlavní navigace"><a href="#home" class="${page === "home" ? "active" : ""}">Balíčky</a><a href="#collection" class="${page === "collection" ? "active" : ""}">Moje sbírka</a><a href="#cards" class="${page === "cards" ? "active" : ""}">Karty</a><a href="#plinko" class="${page === "plinko" ? "active" : ""}">Plinko</a></nav><div class="header-account"><span class="balance">${coin(state.coins)}</span><button class="avatar" data-action="backup" aria-label="Záloha a nastavení" title="Záloha a nastavení">⚙</button></div></header>`;
 }
 function home() {
   const featured = state.catalog.length ? state.catalog : demoCards;
@@ -163,7 +172,133 @@ async function render() {
     });
     return;
   }
+  if (page === "plinko") {
+    shell(plinkoPage());
+    return;
+  }
   location.hash = "home";
+}
+const slotWidth = 100 / (PLINKO_ROWS + 1);
+const pegX = (row: number, j: number) => 50 + (j - row / 2) * slotWidth;
+const pegY = (row: number) => 6 + row * (80 / PLINKO_ROWS);
+function plinkoPage() {
+  const pegs = Array.from({ length: PLINKO_ROWS }, (_, r) =>
+    Array.from(
+      { length: r + 1 },
+      (_, j) =>
+        `<i class="peg" style="left:${pegX(r, j)}%;top:${pegY(r)}%"></i>`,
+    ).join(""),
+  ).join("");
+  const slots = PLINKO_MULTIPLIERS.map(
+    (m, i) =>
+      `<span class="slot ${m >= 3 ? "hot" : m >= 1 ? "warm" : ""}" data-slot="${i}">${m}×</span>`,
+  ).join("");
+  return `<main class="section inner-page plinko-page"><div class="eyebrow">MINCE DOLŮ. ŠTĚSTÍ NAHORU.</div><h1>ONAX <span>PLINKO.</span></h1><p>Vsaď Onaxcoiny a pusť kuličku. Kam dopadne, tím se sázka násobí. Okraje jsou vzácné, ale bolí… v dobrém.</p><div class="plinko-wrap"><div class="plinko-board" aria-hidden="true">${pegs}<div class="slots">${slots}</div></div><div class="plinko-controls"><span>Sázka</span><div role="group" aria-label="Výše sázky">${PLINKO_BETS.map((b) => `<button class="quantity ${b === selectedBet ? "selected" : ""}" data-plinko-bet="${b}" aria-pressed="${b === selectedBet}">${b}</button>`).join("")}</div><span>Kuliček najednou</span><div role="group" aria-label="Počet kuliček">${[1, 5, 10].map((n) => `<button class="quantity ${n === selectedBalls ? "selected" : ""}" data-plinko-balls="${n}" aria-pressed="${n === selectedBalls}">${n}×</button>`).join("")}</div><button class="btn" data-action="plinko-drop" ${state.coins < selectedBet * selectedBalls ? "disabled" : ""}>Pustit ${selectedBalls}× · ${coin(selectedBet * selectedBalls)}</button><p class="plinko-result" role="status">${state.coins < selectedBet * selectedBalls ? "Na tolik kuliček nemáš dost mincí." : "&nbsp;"}</p><p class="fine plinko-net">${plinkoNet ? `Celkem toto kolo: ${plinkoNet > 0 ? "+" : ""}${plinkoNet} OC` : "&nbsp;"}</p></div></div></main>`;
+}
+function plinkoButton() {
+  const btn = document.querySelector<HTMLButtonElement>(
+    "[data-action=plinko-drop]",
+  );
+  if (btn) btn.disabled = state.coins < selectedBet * selectedBalls;
+}
+// Každá kulička je samostatná uložená sázka; další můžeš pouštět, i když ostatní ještě padají.
+async function dropBalls() {
+  const bet = selectedBet;
+  const count = selectedBalls;
+  if (state.coins < bet * count)
+    throw Error(`Na ${count}× ${bet} OC nemáš dost mincí.`);
+  const board = document.querySelector<HTMLElement>(".plinko-board")!;
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const drops: Promise<void>[] = [];
+  for (let i = 0; i < count; i++) {
+    const result = game.plinko(bet);
+    await refresh();
+    plinkoButton();
+    const ball = document.createElement("span");
+    ball.className = "ball";
+    board.append(ball);
+    ballsInFlight++;
+    let m = 0;
+    const keyframes = result.path.map((step, r) => {
+      const at = { left: `${pegX(r, m)}%`, top: `${pegY(r) - 3}%` };
+      m += step;
+      return at;
+    });
+    keyframes.push({ left: `${pegX(PLINKO_ROWS, m)}%`, top: "90%" });
+    gsap.set(ball, { left: "50%", top: "0%", opacity: 1 });
+    drops.push(
+      animate(ball, {
+        keyframes: keyframes.map((k) => ({
+          ...k,
+          duration: reduced ? 0.01 : 0.22,
+          ease: "power1.in",
+        })),
+      }).then(() => {
+        ball.remove();
+        ballsInFlight--;
+        plinkoNet += result.win - bet;
+        const slot = document.querySelector(`[data-slot="${result.slot}"]`);
+        slot?.classList.remove("hit");
+        void (slot as HTMLElement | null)?.offsetWidth;
+        slot?.classList.add("hit");
+        const out = document.querySelector(".plinko-result");
+        if (out) out.textContent = `${result.multiplier}× → ${result.win} OC`;
+        const net = document.querySelector(".plinko-net");
+        if (net)
+          net.textContent = `Celkem toto kolo: ${plinkoNet > 0 ? "+" : ""}${plinkoNet} OC`;
+      }),
+    );
+    if (!reduced && i < count - 1) await new Promise((r) => setTimeout(r, 140));
+  }
+  await Promise.all(drops);
+}
+// Kolo štěstí: barevná výseč = šance. Výsledek je už uložený, ručička ho jen ukáže.
+const WHEEL_R = 80;
+const WHEEL_C = 2 * Math.PI * WHEEL_R;
+function upgradeWheel(c: Card) {
+  const rule = UPGRADE[c.rarity]!;
+  return `<div class="upgrade-view"><div class="eyebrow">RISK JE ZISK · ${UPGRADE_COST}× ${esc(c.name)}</div><h2>${rarityNames[c.rarity]} → <span>${rarityNames[rule.to]}</span></h2><div class="wheel"><svg viewBox="0 0 200 200" aria-hidden="true"><defs><linearGradient id="wheel-hot" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f2c94c"/><stop offset="1" stop-color="#e2452b"/></linearGradient></defs><circle cx="100" cy="100" r="${WHEEL_R}" class="wheel-track"/><circle cx="100" cy="100" r="${WHEEL_R}" class="wheel-win" stroke="url(#wheel-hot)" stroke-dasharray="${(WHEEL_C * rule.chance) / 100} ${WHEEL_C}" transform="rotate(-90 100 100)"/><g class="wheel-pointer"><polygon points="100,8 93,-4 107,-4" /><line x1="100" y1="8" x2="100" y2="30"/></g></svg><div class="wheel-center"><strong>${rule.chance.toFixed(2)}%</strong><small>šance</small></div></div><p class="upgrade-status" role="status">Obětuješ ${UPGRADE_COST} kusy. Když ručička skončí v barevném poli, dostaneš náhodného Onaxe rarity ${rarityNames[rule.to]}. Jinak jsou kusy pryč.</p><button class="btn btn-upgrade-go" data-action="confirm-upgrade" data-id="${c.id}">⬆ Upgrade</button><div class="upgrade-outcome"></div><div class="form-error" role="alert"></div></div>`;
+}
+async function spinUpgrade(id: number) {
+  if (busy) return;
+  busy = true;
+  try {
+    const r = game.upgrade(id);
+    await refresh();
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const arc = r.chance * 3.6;
+    // Úspěch: náhodně uvnitř výseče, neúspěch: kdekoli mimo ni (s malým odstupem od hran).
+    const angle = r.success
+      ? 2 + Math.random() * (arc - 4)
+      : arc + 2 + Math.random() * (356 - arc);
+    document.querySelector(".upgrade-status")!.textContent = "Točí se…";
+    await animate(".wheel-pointer", {
+      rotation: (reduced ? 0 : 360 * 5) + angle,
+      svgOrigin: "100 100",
+      duration: reduced ? 0.15 : 4,
+      ease: "power3.out",
+    });
+    const status = document.querySelector(".upgrade-status");
+    const outcome = document.querySelector(".upgrade-outcome");
+    if (!status || !outcome) return;
+    document.querySelector(".wheel")?.classList.add(r.success ? "won" : "lost");
+    document.querySelector(".btn-upgrade-go")?.remove();
+    status.textContent = r.success
+      ? `VYŠLO TO! ${r.chance} % a máš nového Onaxe.`
+      : `Tentokrát ne. ${UPGRADE_COST} kusy jsou pryč.`;
+    outcome.innerHTML = r.success
+      ? `<div class="result-card">${card(r.card!)}</div><button class="btn" data-action="to-collection">Do sbírky</button>`
+      : `<button class="btn btn-secondary" data-action="to-collection">Zpátky do sbírky</button>`;
+    bindTilt();
+  } finally {
+    busy = false;
+  }
+}
+function upgradeButton(c: Card) {
+  const rule = UPGRADE[c.rarity];
+  const copies = state.inventory.filter((i) => i.id === c.id).length;
+  if (!rule || copies < UPGRADE_COST) return "";
+  return `<button class="btn btn-secondary btn-upgrade" data-upgrade="${c.id}">Vylepšit ${UPGRADE_COST}× → ${rarityNames[rule.to]} · ${rule.chance} %</button>`;
 }
 function drawInventory(cards: Card[]) {
   const visible = cards.filter((c) => filter === "all" || c.rarity === filter);
@@ -175,7 +310,7 @@ function drawInventory(cards: Card[]) {
     ? visible
         .map(
           (c) =>
-            `<div class="owned-card"><button class="card-open" data-detail="${c.inventory_id}" aria-label="Detail karty ${esc(c.name)}">${card(c)}</button><button class="btn btn-sell" data-sell="${c.inventory_id}" data-price="${c.price}">Prodat kartu <span>+ ${c.price} OC</span></button></div>`,
+            `<div class="owned-card"><button class="card-open" data-detail="${c.inventory_id}" aria-label="Detail karty ${esc(c.name)}">${card(c)}</button><button class="btn btn-sell" data-sell="${c.inventory_id}" data-price="${c.price}">Prodat kartu <span>+ ${c.price} OC</span></button>${upgradeButton(c)}</div>`,
         )
         .join("")
     : '<div class="empty"><span>◇</span><h2>ZATÍM ŽÁDNÝ ÚLOVEK.</h2><p>Otevři balíček nebo vyber jinou raritu.</p><button class="btn" data-action="buy">Otevřít balíček <span class="arrow" aria-hidden="true"></span></button></div>';
@@ -209,7 +344,7 @@ function drawCatalog() {
 function detail(c: Card) {
   const owned = state.inventory.filter((i) => i.id === c.id);
   modal(
-    `<div class="card-detail ${c.rarity}"><div class="detail-art">${card(c)}</div><div class="detail-copy"><div class="eyebrow">#${String(c.id).padStart(3, "0")} / ${rarityNames[c.rarity]}</div><h2>${esc(c.name)}</h2><p class="full-description">${esc(c.description) || "Tenhle Onax ještě svůj příběh nenapsal."}</p><dl><div><dt>Prodejní cena</dt><dd>${coin(c.price)}</dd></div><div><dt>Ve tvé sbírce</dt><dd>${owned.length} ks</dd></div></dl>${owned.length ? `<button class="btn" data-detail-sell="${c.inventory_id ?? owned[0].inventory_id}">Prodat jeden kus · +${c.price} OC</button>` : '<p class="fine">Karta zůstává objevená i po prodeji.</p>'}<button class="text-button" data-action="close">Zavřít detail</button><div class="form-error" role="alert"></div></div></div>`,
+    `<div class="card-detail ${c.rarity}"><div class="detail-art">${card(c)}</div><div class="detail-copy"><div class="eyebrow">#${String(c.id).padStart(3, "0")} / ${rarityNames[c.rarity]}</div><h2>${esc(c.name)}</h2><p class="full-description">${esc(c.description) || "Tenhle Onax ještě svůj příběh nenapsal."}</p><dl><div><dt>Prodejní cena</dt><dd>${coin(c.price)}</dd></div><div><dt>Ve tvé sbírce</dt><dd>${owned.length} ks</dd></div></dl>${owned.length ? `<button class="btn" data-detail-sell="${c.inventory_id ?? owned[0].inventory_id}">Prodat jeden kus · +${c.price} OC</button>` : '<p class="fine">Karta zůstává objevená i po prodeji.</p>'}${upgradeButton(c)}<button class="text-button" data-action="close">Zavřít detail</button><div class="form-error" role="alert"></div></div></div>`,
     true,
   );
 }
@@ -548,6 +683,24 @@ app.addEventListener("click", async (e) => {
       await refresh();
       close();
       toast("Karta prodaná. Objev v indexu zůstává.");
+    }
+    if (action === "plinko-drop") await dropBalls();
+    if (target.dataset.plinkoBet || target.dataset.plinkoBalls) {
+      if (ballsInFlight) return;
+      if (target.dataset.plinkoBet)
+        selectedBet = Number(target.dataset.plinkoBet);
+      else selectedBalls = Number(target.dataset.plinkoBalls);
+      await render();
+    }
+    if (target.dataset.upgrade) {
+      const c = state.catalog.find(
+        (c) => c.id === Number(target.dataset.upgrade),
+      );
+      if (c && UPGRADE[c.rarity]) modal(upgradeWheel(c), true);
+    }
+    if (action === "confirm-upgrade") {
+      target.setAttribute("disabled", "");
+      await spinUpgrade(Number(target.dataset.id));
     }
     if (action === "to-collection") {
       close();

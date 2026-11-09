@@ -78,5 +78,117 @@
     "rarity": "legendary",
     "active": 1,
     "image": "images/onax-15.jpg"
+  },
+  {
+    "id": 16,
+    "name": "TUTANCHONAX",
+    "description": "Faraon, který vládl Egyptu tři tisíce let a pořád nestihl odpovědět na zprávy. Jeho zlatá maska váží víc než školní taška v pondělí. Archeologové v jeho hrobce našli poklady, svitky a jednu nedopitou Kofolu. Kletba prý postihne každého, kdo mu sáhne na svačinu.",
+    "rarity": "legendary",
+    "active": 1,
+    "image": "images/onax-16.jpg"
+  },
+  {
+    "id": 17,
+    "name": "WELLNESS ONAX",
+    "description": "Župan, polštář a klid. Wellness Onax dosáhl stavu nirvány, ve kterém ho nevyruší ani budík, ani třídní učitelka. Jeho jedinou životní starostí je, jestli si dá ještě jednu epizodu, nebo tři.",
+    "rarity": "common",
+    "active": 1,
+    "image": "images/onax-17.jpg"
+  },
+  {
+    "id": 18,
+    "name": "ONAXCOIN",
+    "description": "Oficiální platidlo multivesmíru, ražené Českou národní bankou v limitované edici. Na jedné straně korunovaný Onax, na druhé taky Onax. Kurz vůči euru nikdo nezná, ale v Onax Plinku má cenu zlata.",
+    "rarity": "epic",
+    "active": 1,
+    "image": "images/onax-18.jpg"
+  },
+  {
+    "id": 19,
+    "name": "KOŠTĚNAX",
+    "description": "Koštěnax vznikl, když se Onax až příliš ponořil do úklidu pokoje. Teď zametá sám sebe, rodiče jsou nadšení a podlaha se leskne. Na Halloween slouží jako letadlo pro čarodějnice v nouzi.",
+    "rarity": "common",
+    "active": 1,
+    "image": "images/onax-19.jpg"
+  },
+  {
+    "id": 20,
+    "name": "BAČA ONAX",
+    "description": "Bača Onax pase ovce v Tatrách, nosí valašku a jeho pes poslouchá líp než celá třída. Copánky si splétá sám, protože horský vítr nezná slitování. Jeho brynza je legendární, jeho bič práská do rytmu.",
+    "rarity": "rare",
+    "active": 1,
+    "image": "images/onax-20.jpg"
+  },
+  {
+    "id": 21,
+    "name": "PLYNONAX",
+    "description": "Kempingový vařič s duší filozofa. Plynonax uvaří čaj na vrcholu kopce i ve třetím patře paneláku. Varování: neotáčet kolečkem na hlavě bez dovolení, mohlo by se to rozhořet.",
+    "rarity": "rare",
+    "active": 1,
+    "image": "images/onax-21.jpg"
+  },
+  {
+    "id": 22,
+    "name": "ZLATÝ MÍČ ONAX",
+    "description": "Nejlepší fotbalista planety podle hlasování jeho mámy, babičky a jednoho souseda. Zlatý míč převzal v motýlku a se skromností, kterou nikdo nečekal. Na hřišti nikdy nebyl, ale trofej už mu nikdo nevezme.",
+    "rarity": "epic",
+    "active": 1,
+    "image": "images/onax-22.jpg"
+  },
+  {
+    "id": 23,
+    "name": "KAPUCNAX",
+    "description": "Kapuce nahoře, pohled tajemný. Kapucnax je nenápadný jako ninja, kterého ale stejně vidí celá třída. Nikdo neví, co se skrývá pod kapucí. Nejspíš jen účes, který dnes nedopadl.",
+    "rarity": "common",
+    "active": 1,
+    "image": "images/onax-23.jpg"
+  },
+  {
+    "id": 24,
+    "name": "ZIMNÍ ONAX",
+    "description": "Zimní Onax čeká před bankomatem na denní odměnu 50 Onaxcoinů. Peřina je jeho brnění, čepice jeho koruna. Každé ráno si připomíná, že každý velký příběh začíná se 100 mincemi a trochou trpělivosti.",
+    "rarity": "common",
+    "active": 1,
+    "image": "images/onax-24.jpg"
+  },
+  {
+    "id": 25,
+    "name": "STAVBYVEDOUCÍ ONAX",
+    "description": "Helma DOV, výhled na celou Ostravu a sebevědomí ocelárny. Stavbyvedoucí Onax vystoupal na vysokou pec jen proto, aby udělal selfie. Pod jeho dohledem se staví rychleji, ale hlavně fotogeničtěji.",
+    "rarity": "rare",
+    "active": 1,
+    "image": "images/onax-25.jpg"
+  },
+  {
+    "id": 26,
+    "name": "ONIXNAX",
+    "description": "V hlubinách křišťálové jeskyně se probudil kamenný had s tváří Onaxe. Je vysoký jako panelák, tvrdý jako písemka z matiky a když vyleze z vody, třese se celá jeskyně. Chytit ho dokáže jen ten nejlepší trenér.",
+    "rarity": "epic",
+    "active": 1,
+    "image": "images/onax-26.jpg"
+  },
+  {
+    "id": 27,
+    "name": "KOČKONAX",
+    "description": "Kočičí uši, upřený pohled a nulová motivace jít do školy. Kočkonax spí 16 hodin denně, shazuje věci ze stolu a mňouká, když dojdou chipsy. Pohladit se nechá jen vyvoleným.",
+    "rarity": "rare",
+    "active": 1,
+    "image": "images/onax-27.jpg"
+  },
+  {
+    "id": 28,
+    "name": "GLAMONAX",
+    "description": "Platinové vlasy, flitry a pohled z obálky módního časopisu. Glamonax přišel na focení o tři hodiny pozdě a stejně ho všichni chválili. Jeho kondicionér stojí víc než celý Origins balíček.",
+    "rarity": "common",
+    "active": 1,
+    "image": "images/onax-28.jpg"
+  },
+  {
+    "id": 29,
+    "name": "PAT A ONAX",
+    "description": "Legendární kutilská dvojka je zpět. Pat přinesl úsměv, Onax přinesl plán, a výsledek? Polovina bytu zbouraná, ale mají to! Žádná polička není tak rovná, aby ji tihle dva nedokázali vylepšit.",
+    "rarity": "rare",
+    "active": 1,
+    "image": "images/onax-29.jpg"
   }
 ]
